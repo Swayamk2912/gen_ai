@@ -22,31 +22,92 @@
   <section>
     <input type="file" id="pptFile" accept=".ppt,.pptx">
     <button id="uploadBtn">Upload</button>
+    <div class="help-text">
+      💡 <strong>Keyboard shortcuts:</strong> ← → (navigate), Space (play/pause), R (repeat)
+    </div>
   </section>
 
   <section class="slide">
     <div id="progress"></div>
+    <div id="statusIndicator" class="status-indicator">Ready</div>
     <h2 id="slideTitle"></h2>
-    <pre id="slideContent"></pre>
+    
+    <!-- Slide Image Display -->
+    <div id="slideImageContainer" class="slide-image-container" style="display:none;">
+      <img id="slideImage" class="slide-image" alt="Slide Image">
+    </div>
+    
+    <!-- Slide Content (Text) -->
+    <div id="slideContentContainer" class="slide-content-container">
+      <pre id="slideContent"></pre>
+    </div>
+    
     <audio id="audio" controls></audio>
-    <div class="controls">
-      <button id="prevBtn">Prev</button>
-      <button id="narrateBtn">Narrate</button>
-      <button id="pauseBtn">Pause</button>
-      <button id="resumeBtn">Resume</button>
-      <button id="nextBtn">Next</button>
-      <button id="repeatBtn">Repeat</button>
-      <select id="tone">
-        <option value="formal">Formal</option>
-        <option value="friendly">Friendly</option>
-        <option value="academic">Academic</option>
-        <option value="humorous">Humorous</option>
-      </select>
-      <select id="language">
-        <option value="en">English</option>
-        <option value="hi">Hindi</option>
-        <option value="es">Spanish</option>
-      </select>
+    
+    <!-- Navigation Controls -->
+    <div class="control-group">
+      <h4>Slide Navigation</h4>
+      <div class="controls">
+        <button id="prevBtn" class="nav-btn">← Previous</button>
+        <button id="nextBtn" class="nav-btn">Next →</button>
+      </div>
+    </div>
+    
+    <!-- Audio Controls -->
+    <div class="control-group">
+      <h4>Audio Controls</h4>
+      <div class="controls">
+        <button id="narrateBtn" class="audio-btn primary">🎤 Narrate</button>
+        <button id="pauseBtn" class="audio-btn">⏸️ Pause</button>
+        <button id="resumeBtn" class="audio-btn">▶️ Resume</button>
+        <button id="repeatBtn" class="audio-btn">🔄 Repeat</button>
+      </div>
+    </div>
+    
+    <!-- Display Mode Toggle -->
+    <div class="control-group">
+      <h4>Display Mode</h4>
+      <div class="controls">
+        <button id="toggleDisplayBtn" class="display-btn">🖼️ Show Slide Image</button>
+        <button id="toggleContentBtn" class="display-btn">📝 Show Text Content</button>
+        <button id="regenerateSlidesBtn" class="display-btn">🔄 Regenerate Slides</button>
+      </div>
+    </div>
+    
+    <!-- Settings -->
+    <div class="control-group">
+      <h4>Settings</h4>
+      <div class="controls">
+        <select id="tone">
+          <option value="formal">Formal</option>
+          <option value="friendly">Friendly</option>
+          <option value="academic">Academic</option>
+          <option value="humorous">Humorous</option>
+        </select>
+        <select id="language">
+          <option value="en">🇺🇸 English</option>
+          <option value="hi">🇮🇳 Hindi</option>
+          <option value="es">🇪🇸 Spanish</option>
+          <option value="fr">🇫🇷 French</option>
+          <option value="de">🇩🇪 German</option>
+          <option value="it">🇮🇹 Italian</option>
+          <option value="pt">🇵🇹 Portuguese</option>
+          <option value="ru">🇷🇺 Russian</option>
+          <option value="ja">🇯🇵 Japanese</option>
+          <option value="ko">🇰🇷 Korean</option>
+          <option value="zh">🇨🇳 Chinese</option>
+          <option value="ar">🇸🇦 Arabic</option>
+          <option value="nl">🇳🇱 Dutch</option>
+          <option value="sv">🇸🇪 Swedish</option>
+          <option value="no">🇳🇴 Norwegian</option>
+          <option value="da">🇩🇰 Danish</option>
+          <option value="fi">🇫🇮 Finnish</option>
+          <option value="pl">🇵🇱 Polish</option>
+          <option value="tr">🇹🇷 Turkish</option>
+          <option value="th">🇹🇭 Thai</option>
+          <option value="vi">🇻🇳 Vietnamese</option>
+        </select>
+      </div>
     </div>
   </section>
 
@@ -55,6 +116,15 @@
     <input type="text" id="question" placeholder="Type your question..." style="width:60%">
     <button id="askBtn">Ask</button>
     <div id="answer"></div>
+  </section>
+
+  <section>
+    <h3>AI Summary Report</h3>
+    <div class="control-group">
+      <button id="generateSummaryBtn" class="summary-btn primary">📊 Generate AI Summary</button>
+      <button id="exportSummaryBtn" class="summary-btn" style="display:none;">📄 Export Report</button>
+    </div>
+    <div id="summaryReport" style="display:none;"></div>
   </section>
 
   <div id="qaModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4);">

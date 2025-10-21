@@ -33,6 +33,8 @@ def init_db():
             content TEXT,
             narration TEXT,
             audio_path TEXT,
+            image_path TEXT,
+            slide_number INTEGER,
             PRIMARY KEY (presentation_id, slide_index)
         )
         """
@@ -48,6 +50,18 @@ def init_db():
         )
         """
     )
+    
+    # Add new columns to existing slides table if they don't exist
+    try:
+        cur.execute("ALTER TABLE slides ADD COLUMN image_path TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
+    try:
+        cur.execute("ALTER TABLE slides ADD COLUMN slide_number INTEGER")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
     conn.commit()
     conn.close()
 
@@ -62,8 +76,8 @@ def save_presentation(pres_id: str, filename: str) -> None:
 def save_slide(pres_id: str, index: int, slide: Dict[str, Any]) -> None:
     conn = get_conn()
     conn.execute(
-        "INSERT OR REPLACE INTO slides (presentation_id, slide_index, title, content) VALUES (?, ?, ?, ?)",
-        (pres_id, index, slide.get("title", ""), slide.get("content", "")),
+        "INSERT OR REPLACE INTO slides (presentation_id, slide_index, title, content, image_path, slide_number) VALUES (?, ?, ?, ?, ?, ?)",
+        (pres_id, index, slide.get("title", ""), slide.get("content", ""), slide.get("image_path"), slide.get("slide_number")),
     )
     conn.commit()
     conn.close()
@@ -91,7 +105,7 @@ def get_presentation(pres_id: str) -> Dict[str, Any]:
 def get_slides(pres_id: str) -> List[Dict[str, Any]]:
     conn = get_conn()
     rows = conn.execute(
-        "SELECT slide_index, title, content, narration, audio_path FROM slides WHERE presentation_id = ? ORDER BY slide_index",
+        "SELECT slide_index, title, content, narration, audio_path, image_path, slide_number FROM slides WHERE presentation_id = ? ORDER BY slide_index",
         (pres_id,),
     ).fetchall()
     conn.close()
@@ -102,6 +116,8 @@ def get_slides(pres_id: str) -> List[Dict[str, Any]]:
             "content": r["content"],
             "narration": r["narration"],
             "audio_path": r["audio_path"],
+            "image_path": r["image_path"],
+            "slide_number": r["slide_number"],
         }
         for r in rows
     ]

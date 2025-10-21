@@ -9,15 +9,18 @@ import os
 import io
 
 from .services.ppt_parser import parse_presentation
-from .services.ai import generate_slide_narration, answer_question
+from .services.ai import generate_slide_narration, answer_question, generate_summary_report
 from .services.tts import synthesize_speech
+from .services.translation import translation_service
 from .db import init_db, save_presentation, save_slide, get_presentation, get_slides, save_qa_log, get_qa_logs, update_slide_audio
 
 
 UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
 AUDIO_DIR = os.path.join(os.getcwd(), "audio")
+SLIDES_DIR = os.path.join(os.getcwd(), "slides")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(AUDIO_DIR, exist_ok=True)
+os.makedirs(SLIDES_DIR, exist_ok=True)
 
 
 class UploadResponse(BaseModel):
@@ -39,6 +42,16 @@ class QARequest(BaseModel):
     question: str
     language: Optional[str] = "en"
     tone: Optional[str] = "formal"
+
+
+class LanguageDetectionRequest(BaseModel):
+    text: str
+
+
+class TranslationRequest(BaseModel):
+    text: str
+    target_language: str
+    source_language: Optional[str] = "auto"
 
 
 app = FastAPI(title="GenAI Presentation Agent")
@@ -91,10 +104,15 @@ def narrate_slide(req: NarrationRequest):
         raise HTTPException(status_code=404, detail="Slide not found")
 
     slide = slides[req.slide_index]
-    narration_text = generate_slide_narration(slide, slides, tone=req.tone, language=req.language)
+    narration_data = generate_slide_narration(slide, slides, tone=req.tone, language=req.language)
+    narration_text = narration_data["full_text"]
     audio_path = synthesize_speech(narration_text, AUDIO_DIR, voice=req.voice, language=req.language)
     update_slide_audio(req.presentation_id, req.slide_index, narration_text, audio_path)
-    return {"text": narration_text, "audio_url": f"/audio/{os.path.basename(audio_path)}"}
+    return {
+        "text": narration_text, 
+        "audio_url": f"/audio/{os.path.basename(audio_path)}",
+        "segments": narration_data["segments"]
+    }
 
 
 @app.get("/audio/{filename}")
@@ -103,6 +121,99 @@ def get_audio(filename: str):
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Audio not found")
     return FileResponse(path, media_type="audio/mpeg")
+
+
+@app.get("/slides/{filename}")
+def get_slide_image(filename: str):
+    path = os.path.join(SLIDES_DIR, filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Slide image not found")
+    
+    # Determine media type based on file extension
+    if filename.endswith('.html'):
+        return FileResponse(path, media_type="text/html")
+    elif filename.endswith('.txt'):
+        return FileResponse(path, media_type="text/plain")
+    else:
+        return FileResponse(path, media_type="image/png")
+
+
+@app.get("/debug/slides/{presentation_id}")
+def debug_slides(presentation_id: str):
+    """Debug endpoint to check slide data"""
+    try:
+        pres = get_presentation(presentation_id)
+        slides = get_slides(presentation_id)
+        
+        if not pres:
+            raise HTTPException(status_code=404, detail="Presentation not found")
+        
+        # Check if slides directory exists and list files
+        slides_dir = os.path.join(os.getcwd(), "slides")
+        slide_files = []
+        if os.path.exists(slides_dir):
+            slide_files = os.listdir(slides_dir)
+        
+        # Check if slide files exist
+        slide_file_status = []
+        for slide in slides:
+            if slide.get('image_path'):
+                file_path = os.path.join(slides_dir, slide['image_path'].split('/')[-1])
+                slide_file_status.append({
+                    'slide_index': slide.get('slide_number', 'unknown'),
+                    'image_path': slide['image_path'],
+                    'file_exists': os.path.exists(file_path),
+                    'file_size': os.path.getsize(file_path) if os.path.exists(file_path) else 0
+                })
+        
+        return {
+            "presentation": pres,
+            "slides": slides,
+            "slides_directory": slides_dir,
+            "slide_files": slide_files,
+            "slides_dir_exists": os.path.exists(slides_dir),
+            "slide_file_status": slide_file_status
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Debug failed: {str(e)}")
+
+
+@app.post("/regenerate-slides/{presentation_id}")
+def regenerate_slides(presentation_id: str):
+    """Regenerate slide images for an existing presentation"""
+    try:
+        from .services.ppt_parser import parse_presentation
+        
+        # Get presentation info
+        pres = get_presentation(presentation_id)
+        if not pres:
+            raise HTTPException(status_code=404, detail="Presentation not found")
+        
+        # Find the original file
+        upload_dir = os.path.join(os.getcwd(), "uploads")
+        original_files = [f for f in os.listdir(upload_dir) if f.startswith(presentation_id)]
+        
+        if not original_files:
+            raise HTTPException(status_code=404, detail="Original presentation file not found")
+        
+        original_file = os.path.join(upload_dir, original_files[0])
+        
+        # Re-parse the presentation to regenerate slide images
+        slides_data = parse_presentation(original_file)
+        
+        # Update database with new slide data
+        for idx, slide in enumerate(slides_data):
+            save_slide(presentation_id, idx, slide)
+        
+        return {
+            "message": "Slides regenerated successfully",
+            "slides_count": len(slides_data),
+            "slides": slides_data
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Regeneration failed: {str(e)}")
 
 
 @app.post("/qa")
@@ -133,6 +244,65 @@ def summary(presentation_id: str):
     # Simple summary baseline
     topics = [s["title"] for s in slides if s.get("title")]
     return {"title": pres["filename"], "num_slides": len(slides), "topics": topics, "qa_count": len(qas)}
+
+
+@app.get("/ai-summary/{presentation_id}")
+def ai_summary_report(presentation_id: str, language: str = "en"):
+    """Generate comprehensive AI summary report with key topics, Q&A analysis, and insights"""
+    try:
+        pres = get_presentation(presentation_id)
+        slides = get_slides(presentation_id)
+        qa_logs = get_qa_logs(presentation_id)
+        
+        if not pres:
+            raise HTTPException(status_code=404, detail="Presentation not found")
+        
+        # Generate AI summary report
+        summary_report = generate_summary_report(pres, slides, qa_logs, language)
+        
+        return summary_report
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate summary report: {str(e)}")
+
+
+@app.get("/languages")
+def get_supported_languages():
+    """Get list of supported languages for translation"""
+    return {
+        "languages": translation_service.get_supported_languages(),
+        "default": "en"
+    }
+
+
+@app.post("/detect-language")
+def detect_language(req: LanguageDetectionRequest):
+    """Detect the language of input text"""
+    detected_lang = translation_service.detect_language(req.text)
+    return {
+        "language": detected_lang,
+        "language_name": translation_service.get_supported_languages().get(detected_lang, "Unknown"),
+        "confidence": "medium"  # Placeholder for future confidence scoring
+    }
+
+
+@app.post("/translate")
+def translate_text(req: TranslationRequest):
+    """Translate text to target language"""
+    try:
+        translated_text = translation_service.translate_text(
+            req.text, 
+            req.target_language, 
+            req.source_language
+        )
+        return {
+            "original_text": req.text,
+            "translated_text": translated_text,
+            "source_language": req.source_language,
+            "target_language": req.target_language
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Translation failed: {str(e)}")
 
 
 @app.get("/")
