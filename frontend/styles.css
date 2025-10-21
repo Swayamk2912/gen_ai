@@ -1,0 +1,222 @@
+/* Design tokens */
+:root {
+  --bg: #0b1020;
+  --card: #11162a;
+  --card-2: #0e1426;
+  --text: #e7eaf3;
+  --muted: #a6b0cf;
+  --primary: #6ea8fe;
+  --primary-600: #5593fb;
+  --primary-700: #3c7df6;
+  --accent: #b987ff;
+  --success: #3ddc97;
+  --warning: #ffd166;
+  --danger: #ff6b6b;
+  --border: #1e2747;
+  --ring: #2a3663;
+  --shadow: 0 10px 30px rgba(2, 6, 23, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Typography & page */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  margin: 0;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(110, 168, 254, 0.12), transparent 50%),
+    radial-gradient(800px 400px at 100% 10%, rgba(185, 135, 255, 0.10), transparent 40%),
+    linear-gradient(180deg, #0a0f1e 0%, #0b1020 100%);
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr min(1100px, 92vw) 1fr;
+}
+
+body > * {
+  grid-column: 2;
+}
+
+h1 {
+  margin: 32px 0 16px 0;
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: 0.3px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.3);
+}
+
+section {
+  margin-top: 16px;
+}
+
+/* Cards */
+.slide,
+section {
+  background: linear-gradient(180deg, var(--card) 0%, var(--card-2) 100%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.slide {
+  margin-top: 16px;
+}
+
+/* Inputs */
+input[type="text"],
+input[type="file"],
+select {
+  background: #0f1530;
+  color: var(--text);
+  border: 1px solid var(--ring);
+  outline: none;
+  padding: 10px 12px;
+  border-radius: 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.05s ease;
+}
+
+input[type="file"]::-webkit-file-upload-button {
+  background: linear-gradient(180deg, var(--primary) 0%, var(--primary-600) 100%);
+  color: #06102a;
+  border: none;
+  padding: 8px 12px;
+  margin-right: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+input[type="text"]:focus,
+select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(110,168,254,0.15);
+}
+
+/* Buttons */
+.controls button,
+button {
+  appearance: none;
+  border: 1px solid var(--ring);
+  color: #08122f;
+  background: linear-gradient(180deg, var(--primary) 0%, var(--primary-600) 100%);
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  transition: transform 0.06s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  box-shadow: 0 6px 20px rgba(110, 168, 254, 0.25);
+}
+
+.controls button:hover,
+button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+
+.controls button:active,
+button:active {
+  transform: translateY(0);
+}
+
+button#prevBtn,
+button#pauseBtn {
+  background: linear-gradient(180deg, #dbe4ff 0%, #c8d6ff 100%);
+}
+
+button#resumeBtn,
+button#repeatBtn {
+  background: linear-gradient(180deg, #c3f7e5 0%, #aaf0d7 100%);
+}
+
+button#nextBtn {
+  background: linear-gradient(180deg, var(--accent) 0%, #a36bff 100%);
+  color: #100627;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* Slide content */
+#progress {
+  display: inline-block;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(110,168,254,0.12);
+  border: 1px solid rgba(110,168,254,0.25);
+}
+
+#slideTitle {
+  margin: 8px 0 8px 0;
+  font-size: 20px;
+}
+
+#slideContent {
+  white-space: pre-wrap;
+  background: #0c1227;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--ring);
+  color: #e3e7f5;
+}
+
+audio {
+  width: 100%;
+  margin-top: 10px;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.25));
+}
+
+/* Answer / QA */
+#answer {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(78, 121, 206, 0.18) 0%, rgba(54, 93, 182, 0.18) 100%);
+  border-left: 4px solid var(--primary);
+  border-radius: 10px;
+}
+
+/* Modal overrides (structure is inline in HTML) */
+#qaModal {
+  backdrop-filter: blur(6px);
+}
+
+#qaModal > div {
+  background: linear-gradient(180deg, var(--card) 0%, var(--card-2) 100%) !important;
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+#qaModal input[type="text"] {
+  width: 100% !important;
+}
+
+#modalAnswer {
+  background: #0c1227;
+  border: 1px solid var(--ring);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+/* Utilities */
+::selection {
+  background: rgba(110,168,254,0.35);
+}
+
+@media (max-width: 640px) {
+  h1 { font-size: 22px; }
+  .controls { gap: 8px; }
+  .controls button, button { padding: 9px 12px; }
+}

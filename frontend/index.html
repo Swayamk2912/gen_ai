@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GenAI Presentation Agent</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script defer src="/static/app.js"></script>
+  <style>
+    /* fallback if styles.css not loaded */
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    .controls button { margin-right: 8px; }
+    .slide { border: 1px solid #ccc; padding: 12px; border-radius: 8px; margin-top: 12px; }
+  </style>
+  
+  <script>
+    window.BACKEND_BASE = "http://127.0.0.1:8000";
+  </script>
+</head>
+<body>
+  <h1>GenAI Presentation Agent</h1>
+  <section>
+    <input type="file" id="pptFile" accept=".ppt,.pptx">
+    <button id="uploadBtn">Upload</button>
+  </section>
+
+  <section class="slide">
+    <div id="progress"></div>
+    <h2 id="slideTitle"></h2>
+    <pre id="slideContent"></pre>
+    <audio id="audio" controls></audio>
+    <div class="controls">
+      <button id="prevBtn">Prev</button>
+      <button id="narrateBtn">Narrate</button>
+      <button id="pauseBtn">Pause</button>
+      <button id="resumeBtn">Resume</button>
+      <button id="nextBtn">Next</button>
+      <button id="repeatBtn">Repeat</button>
+      <select id="tone">
+        <option value="formal">Formal</option>
+        <option value="friendly">Friendly</option>
+        <option value="academic">Academic</option>
+        <option value="humorous">Humorous</option>
+      </select>
+      <select id="language">
+        <option value="en">English</option>
+        <option value="hi">Hindi</option>
+        <option value="es">Spanish</option>
+      </select>
+    </div>
+  </section>
+
+  <section>
+    <h3>Ask a Question</h3>
+    <input type="text" id="question" placeholder="Type your question..." style="width:60%">
+    <button id="askBtn">Ask</button>
+    <div id="answer"></div>
+  </section>
+
+  <div id="qaModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4);">
+    <div style="background:#fff; max-width:600px; margin:10% auto; padding:16px; border-radius:8px;">
+      <h3>Any questions about this slide?</h3>
+      <input type="text" id="modalQuestion" placeholder="Type your question here..." style="width:100%; margin-bottom:8px;">
+      <div style="text-align:right;">
+        <button id="skipBtn">No, continue</button>
+        <button id="modalAskBtn">Ask</button>
+      </div>
+      <div id="modalAnswer" style="margin-top:8px;"></div>
+    </div>
+  </div>
+</body>
+</html>
