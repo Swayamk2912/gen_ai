@@ -32,17 +32,60 @@
     <div id="statusIndicator" class="status-indicator">Ready</div>
     <h2 id="slideTitle"></h2>
     
-    <!-- Slide Image Display -->
-    <div id="slideImageContainer" class="slide-image-container" style="display:none;">
-      <img id="slideImage" class="slide-image" alt="Slide Image">
+    <!-- Human Presenter Mode - Original Slide Display -->
+    <div id="presenterMode" class="presenter-mode">
+      <!-- Original PowerPoint Slide Display -->
+      <div id="originalSlideContainer" class="original-slide-container">
+        <div class="slide-header">
+          <h3>📊 Original PowerPoint Slide</h3>
+          <div class="slide-controls">
+            <button id="toggleSlideView" class="slide-view-btn">🖼️ Full View</button>
+            <button id="toggleSlideZoom" class="slide-zoom-btn">🔍 Zoom</button>
+          </div>
+        </div>
+        <div id="originalSlideDisplay" class="original-slide-display">
+          <div id="slideImageContainer" class="slide-image-container">
+            <img id="slideImage" class="slide-image" alt="Original PowerPoint Slide">
+            <div id="slideLoading" class="slide-loading" style="display:none;">
+              <div class="loading-spinner"></div>
+              <p>Loading original slide...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- AI Presenter Narration Panel -->
+      <div id="aiPresenterPanel" class="ai-presenter-panel">
+        <div class="presenter-header">
+          <h3>🎤 AI Presenter Narration</h3>
+          <div class="presenter-status">
+            <span id="presenterStatus" class="presenter-status-text">Ready to present</span>
+            <div id="speakingIndicator" class="speaking-indicator" style="display:none;">
+              <div class="speaking-dots">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Enhanced Slide Content with Real-time Highlighting -->
+        <div id="slideContentContainer" class="slide-content-container presenter-content">
+          <div id="slideContent" class="slide-content-enhanced"></div>
+        </div>
+        
+        <!-- Audio Controls -->
+        <div class="audio-controls-panel">
+          <audio id="audio" controls class="presenter-audio"></audio>
+          <div class="audio-controls-manual">
+            <button id="manualPlayBtn" class="manual-play-btn" style="display:none;">▶️ Play Audio</button>
+            <span id="audioStatus" class="audio-status">Ready</span>
+          </div>
+          <div class="audio-visualizer">
+            <div id="audioWaveform" class="audio-waveform"></div>
+          </div>
+        </div>
+      </div>
     </div>
-    
-    <!-- Slide Content (Text) -->
-    <div id="slideContentContainer" class="slide-content-container">
-      <pre id="slideContent"></pre>
-    </div>
-    
-    <audio id="audio" controls></audio>
     
     <!-- Navigation Controls -->
     <div class="control-group">
@@ -68,7 +111,7 @@
     <div class="control-group">
       <h4>Display Mode</h4>
       <div class="controls">
-        <button id="toggleDisplayBtn" class="display-btn">🖼️ Show Slide Image</button>
+        <button id="toggleDisplayBtn" class="display-btn">🖼️ Show PowerPoint Slide</button>
         <button id="toggleContentBtn" class="display-btn">📝 Show Text Content</button>
         <button id="regenerateSlidesBtn" class="display-btn">🔄 Regenerate Slides</button>
       </div>

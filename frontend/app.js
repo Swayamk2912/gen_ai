@@ -73,26 +73,58 @@ function render() {
   clearSyncInterval();
   updateButtonStates();
   
-  // Render slide content with enhanced presenter-like display
-  renderSlideContent(s.content || '');
+  // Display slide image as primary content (actual PowerPoint slide)
+  displaySlideImage(s);
   document.getElementById('progress').textContent = `Slide ${current + 1} of ${slides.length}`;
   
-  // Display slide image if available
-  displaySlideImage(s);
+  // Only render text content if no slide image is available
+  if (!s.image_path) {
+    renderSlideContent(s.content || '');
+  }
   
   // Show presenter mode indicator
   showPresenterMode();
   
+  // Initialize presenter mode
+  initializePresenterMode();
+  
   if (s.audio_path) {
     const file = s.audio_path.split('/').pop();
     const audio = document.getElementById('audio');
-    audio.src = `${window.BACKEND_BASE}/audio/${file}`;
-    audio.currentTime = 0; // Reset audio to beginning
+    if (audio) {
+      audio.src = `${window.BACKEND_BASE}/audio/${file}`;
+      audio.currentTime = 0; // Reset audio to beginning
+      console.log('Set existing audio source to:', audio.src);
+      
+      // Auto-start narration for seamless presentation flow
+      setTimeout(() => {
+        if (!isPlaying && !isPaused) {
+          startPresentationMode();
+        }
+      }, 500);
+    } else {
+      console.error('Audio element not found in render function');
+    }
+  } else {
+    // Auto-generate narration for slides without audio for seamless presentation flow
+    console.log('No existing audio found, auto-generating narration for slide:', current);
     
-    // Auto-start narration for seamless presentation flow
+    // Update status to show auto-generation
+    const statusIndicator = document.getElementById('statusIndicator');
+    const presenterStatus = document.getElementById('presenterStatus');
+    
+    if (statusIndicator) {
+      statusIndicator.textContent = 'Generating narration...';
+      statusIndicator.className = 'status-indicator generating';
+    }
+    
+    if (presenterStatus) {
+      presenterStatus.textContent = 'Preparing AI narration...';
+    }
+    
     setTimeout(() => {
       if (!isPlaying && !isPaused) {
-        startPresentationMode();
+        narrate();
       }
     }, 500);
   }
@@ -172,28 +204,85 @@ function updateSync() {
   enhanceAudioSynchronization();
 }
 
-function highlightMatchingContent(highlightText) {
-  const lines = document.querySelectorAll('.content-line');
-  
-  lines.forEach(line => {
-    const lineText = line.textContent.toLowerCase();
-    const highlightLower = highlightText.toLowerCase();
-    
-    // Check if this line contains the highlight text
-    if (lineText.includes(highlightLower) || highlightLower.includes(lineText.trim())) {
-      line.classList.add('current-highlight');
-    }
+function highlightMatchingContent(highlightText, segmentType = null) {
+  // Clear previous highlights
+  document.querySelectorAll('.content-line, .slide-title, .bullet-point, .list-item, .paragraph').forEach(line => {
+    line.classList.remove('current-highlight');
   });
+  
+  // Try different selectors based on segment type
+  let selectors = ['.content-line'];
+  
+  if (segmentType === 'title') {
+    selectors = ['.slide-title', '.content-line:first-child'];
+  } else if (segmentType === 'bullet') {
+    selectors = ['.bullet-point', '.content-line.bullet-point'];
+  } else if (segmentType === 'list') {
+    selectors = ['.list-item', '.content-line.numbered-point'];
+  } else if (segmentType === 'paragraph') {
+    selectors = ['.paragraph', '.content-line.regular-content'];
+  }
+  
+  // Search through all relevant elements
+  selectors.forEach(selector => {
+    const elements = document.querySelectorAll(selector);
+    
+    elements.forEach(element => {
+      const elementText = element.textContent.toLowerCase().trim();
+      const highlightLower = highlightText.toLowerCase().trim();
+      
+      // More flexible matching for better synchronization
+      const words = highlightLower.split(/\s+/);
+      const elementWords = elementText.split(/\s+/);
+      
+      // Check for exact match or significant word overlap
+      if (elementText.includes(highlightLower) || 
+          highlightLower.includes(elementText) ||
+          words.some(word => word.length > 3 && elementWords.some(ew => ew.includes(word)))) {
+        element.classList.add('current-highlight');
+      }
+    });
+  });
+  
+  // Fallback: if no specific matches found, try general content lines
+  if (!document.querySelector('.current-highlight')) {
+    const lines = document.querySelectorAll('.content-line');
+    
+    lines.forEach(line => {
+      const lineText = line.textContent.toLowerCase();
+      const highlightLower = highlightText.toLowerCase();
+      
+      if (lineText.includes(highlightLower) || highlightLower.includes(lineText.trim())) {
+        line.classList.add('current-highlight');
+      }
+    });
+  }
 }
 
 function showPresenterMode() {
   const statusIndicator = document.getElementById('statusIndicator');
-  statusIndicator.textContent = 'AI Presenter Ready';
-  statusIndicator.className = 'status-indicator presenter-ready';
+  const presenterStatus = document.getElementById('presenterStatus');
+  const speakingIndicator = document.getElementById('speakingIndicator');
+  
+  if (statusIndicator) {
+    statusIndicator.textContent = 'AI Presenter Ready';
+    statusIndicator.className = 'status-indicator presenter-ready';
+  }
+  
+  if (presenterStatus) {
+    presenterStatus.textContent = 'Ready to present';
+  }
+  
+  if (speakingIndicator) {
+    speakingIndicator.style.display = 'none';
+  }
 }
 
 function startPresentationMode() {
   const audio = document.getElementById('audio');
+  const presenterStatus = document.getElementById('presenterStatus');
+  const speakingIndicator = document.getElementById('speakingIndicator');
+  
   if (audio && audio.src) {
     audio.play().then(() => {
       isPlaying = true;
@@ -202,11 +291,71 @@ function startPresentationMode() {
       
       // Update status to show AI is presenting
       const statusIndicator = document.getElementById('statusIndicator');
-      statusIndicator.textContent = 'AI Presenting';
-      statusIndicator.className = 'status-indicator presenting';
+      if (statusIndicator) {
+        statusIndicator.textContent = 'AI Presenting';
+        statusIndicator.className = 'status-indicator presenting';
+      }
+      
+      if (presenterStatus) {
+        presenterStatus.textContent = 'AI is speaking...';
+      }
+      
+      if (speakingIndicator) {
+        speakingIndicator.style.display = 'flex';
+      }
+      
+      // Start audio visualization
+      startAudioVisualization();
     }).catch(error => {
       console.error('Auto-play failed:', error);
     });
+  }
+}
+
+function startAudioVisualization() {
+  const audio = document.getElementById('audio');
+  const waveform = document.getElementById('audioWaveform');
+  
+  if (!audio || !waveform) return;
+  
+  // Create audio context for visualization
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = audioContext.createAnalyser();
+    const source = audioContext.createMediaElementSource(audio);
+    
+    source.connect(analyser);
+    analyser.connect(audioContext.destination);
+    
+    analyser.fftSize = 256;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    
+    function visualize() {
+      if (!isPlaying) return;
+      
+      analyser.getByteFrequencyData(dataArray);
+      
+      // Create simple waveform visualization
+      const bars = Math.min(20, bufferLength);
+      const barWidth = 100 / bars;
+      let waveformHTML = '';
+      
+      for (let i = 0; i < bars; i++) {
+        const value = dataArray[Math.floor(i * bufferLength / bars)];
+        const height = (value / 255) * 100;
+        waveformHTML += `<div style="width: ${barWidth}%; height: ${height}%; background: var(--primary); margin: 0 1px; border-radius: 2px;"></div>`;
+      }
+      
+      waveform.innerHTML = waveformHTML;
+      requestAnimationFrame(visualize);
+    }
+    
+    visualize();
+  } catch (error) {
+    console.log('Audio visualization not available:', error);
+    // Fallback to static visualization
+    waveform.innerHTML = '<div style="width: 100%; height: 100%; background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 50%, var(--success) 100%); border-radius: 10px; animation: waveform-pulse 2s infinite;"></div>';
   }
 }
 
@@ -245,23 +394,57 @@ function enhanceAudioSynchronization() {
   
   if (activeSegment !== currentSegment && activeSegment >= 0) {
     // Remove previous highlighting
-    document.querySelectorAll('.content-line').forEach(line => {
-      line.classList.remove('current-highlight', 'speaking');
+    document.querySelectorAll('.content-line, .slide-title, .bullet-point, .list-item, .paragraph').forEach(line => {
+      line.classList.remove('current-highlight', 'speaking', 'title-highlight', 'bullet-highlight', 'list-highlight', 'paragraph-highlight');
     });
     
-    // Add current highlighting
+    // Add current highlighting based on segment type
     const segment = narrationSegments[activeSegment];
     if (segment.highlight_text) {
-      highlightMatchingContent(segment.highlight_text);
+      highlightMatchingContent(segment.highlight_text, segment.type);
       
-      // Add speaking indicator
+      // Add type-specific speaking indicator
       const highlightedLines = document.querySelectorAll('.current-highlight');
       highlightedLines.forEach(line => {
         line.classList.add('speaking');
+        
+        // Add type-specific highlighting
+        if (segment.type === 'title') {
+          line.classList.add('title-highlight');
+        } else if (segment.type === 'bullet') {
+          line.classList.add('bullet-highlight');
+        } else if (segment.type === 'list') {
+          line.classList.add('list-highlight');
+        } else if (segment.type === 'paragraph') {
+          line.classList.add('paragraph-highlight');
+        }
       });
     }
     
+    // Update status indicator with current segment info
+    updateStatusIndicator(segment);
+    
     currentSegment = activeSegment;
+  }
+}
+
+function updateStatusIndicator(segment) {
+  const statusIndicator = document.getElementById('statusIndicator');
+  if (statusIndicator && segment) {
+    let statusText = 'AI Presenting';
+    if (segment.type === 'title') {
+      statusText = 'Introducing slide topic';
+    } else if (segment.type === 'bullet') {
+      statusText = `Explaining point ${segment.index || ''}`;
+    } else if (segment.type === 'list') {
+      statusText = `Covering step ${segment.index || ''}`;
+    } else if (segment.type === 'heading') {
+      statusText = 'Discussing section';
+    } else if (segment.type === 'paragraph') {
+      statusText = 'Explaining details';
+    }
+    
+    statusIndicator.textContent = statusText;
   }
 }
 
@@ -270,13 +453,24 @@ async function narrate() {
   const tone = document.getElementById('tone').value;
   const language = document.getElementById('language').value;
   
+  console.log('Starting narration for slide:', current, 'with tone:', tone, 'language:', language);
+  
   try {
     const res = await fetch(`${window.BACKEND_BASE}/narrate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ presentation_id: presId, slide_index: current, tone, language })
     });
+    
+    console.log('Narration response status:', res.status);
+    
+    if (!res.ok) {
+      throw new Error(`Narration failed with status ${res.status}`);
+    }
+    
     const data = await res.json();
+    console.log('Narration data received:', data);
+    
     await loadPresentation();
     
     // Preserve display mode when re-rendering
@@ -287,18 +481,72 @@ async function narrate() {
     
     if (data.audio_url) {
       const audio = document.getElementById('audio');
-      audio.src = `${window.BACKEND_BASE}${data.audio_url}`;
+      if (!audio) {
+        console.error('Audio element not found!');
+        alert('Audio element not found. Please check the HTML structure.');
+        return;
+      }
+      
+      const audioUrl = `${window.BACKEND_BASE}${data.audio_url}`;
+      console.log('Setting audio source to:', audioUrl);
+      
+      audio.src = audioUrl;
+      
+      // Add error handling for audio loading
+      audio.onerror = (e) => {
+        console.error('Audio loading error:', e);
+        console.error('Audio src:', audio.src);
+        console.error('Audio networkState:', audio.networkState);
+        console.error('Audio readyState:', audio.readyState);
+      };
+      
+      audio.onloadstart = () => {
+        console.log('Audio loading started');
+        document.getElementById('audioStatus').textContent = 'Loading audio...';
+      };
+      
+      audio.oncanplay = () => {
+        console.log('Audio can play');
+        document.getElementById('audioStatus').textContent = 'Audio ready';
+      };
+      
+      audio.onloadeddata = () => {
+        console.log('Audio data loaded');
+        document.getElementById('audioStatus').textContent = 'Audio loaded';
+      };
+      
+      audio.onloadedmetadata = () => {
+        console.log('Audio metadata loaded');
+        document.getElementById('audioStatus').textContent = 'Metadata loaded';
+      };
       
       // Set up audio event listeners for presenter mode
       audio.onplay = () => {
+        console.log('Audio started playing');
         isPlaying = true;
         isPaused = false;
         updateButtonStates();
         
         // Update status to show AI is presenting
         const statusIndicator = document.getElementById('statusIndicator');
-        statusIndicator.textContent = 'AI Presenting';
-        statusIndicator.className = 'status-indicator presenting';
+        const presenterStatus = document.getElementById('presenterStatus');
+        const speakingIndicator = document.getElementById('speakingIndicator');
+        
+        if (statusIndicator) {
+          statusIndicator.textContent = 'AI Presenting';
+          statusIndicator.className = 'status-indicator presenting';
+        }
+        
+        if (presenterStatus) {
+          presenterStatus.textContent = 'AI is speaking...';
+        }
+        
+        if (speakingIndicator) {
+          speakingIndicator.style.display = 'flex';
+        }
+        
+        // Start audio visualization
+        startAudioVisualization();
         
         // Start synchronization if segments are available
         if (data.segments && data.segments.length > 0) {
@@ -311,6 +559,18 @@ async function narrate() {
         isPaused = true;
         clearSyncInterval();
         updateButtonStates();
+        
+        // Update presenter status
+        const presenterStatus = document.getElementById('presenterStatus');
+        const speakingIndicator = document.getElementById('speakingIndicator');
+        
+        if (presenterStatus) {
+          presenterStatus.textContent = 'Paused';
+        }
+        
+        if (speakingIndicator) {
+          speakingIndicator.style.display = 'none';
+        }
       };
       
       audio.onended = () => {
@@ -318,11 +578,51 @@ async function narrate() {
         isPaused = false;
         clearSyncInterval();
         updateButtonStates();
+        
+        // Update presenter status
+        const presenterStatus = document.getElementById('presenterStatus');
+        const speakingIndicator = document.getElementById('speakingIndicator');
+        
+        if (presenterStatus) {
+          presenterStatus.textContent = 'Presentation complete';
+        }
+        
+        if (speakingIndicator) {
+          speakingIndicator.style.display = 'none';
+        }
+        
         showQAModal();
       };
       
       // Start playing
-      await audio.play();
+      console.log('Attempting to play audio...');
+      console.log('Audio element before play:', {
+        src: audio.src,
+        readyState: audio.readyState,
+        networkState: audio.networkState,
+        paused: audio.paused,
+        duration: audio.duration
+      });
+      
+      try {
+        await audio.play();
+        console.log('Audio play successful');
+      } catch (playError) {
+        console.error('Audio play failed:', playError);
+        console.error('Play error details:', {
+          name: playError.name,
+          message: playError.message,
+          code: playError.code
+        });
+        
+        // Try to handle autoplay restrictions
+        if (playError.name === 'NotAllowedError') {
+          console.log('Autoplay blocked, user interaction required');
+          // Show manual play button
+          document.getElementById('manualPlayBtn').style.display = 'inline-block';
+          document.getElementById('audioStatus').textContent = 'Click play button to start';
+        }
+      }
       
       // Prevent advancing during narration
       canAdvance = false;
@@ -348,6 +648,12 @@ function nextSlide() {
   // Clear synchronization
   clearSyncInterval();
   
+  // Reset audio state
+  isPlaying = false;
+  isPaused = false;
+  narrationSegments = [];
+  currentSegment = 0;
+  
   current = Math.min(current + 1, slides.length - 1);
   render();
 }
@@ -364,6 +670,12 @@ function prevSlide() {
   
   // Clear synchronization
   clearSyncInterval();
+  
+  // Reset audio state
+  isPlaying = false;
+  isPaused = false;
+  narrationSegments = [];
+  currentSegment = 0;
   
   current = Math.max(current - 1, 0);
   render();
@@ -512,6 +824,18 @@ function getLanguageFlag(langCode) {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  // Debug: Check if audio element exists
+  const audio = document.getElementById('audio');
+  console.log('Audio element found:', !!audio);
+  if (audio) {
+    console.log('Audio element details:', {
+      id: audio.id,
+      controls: audio.controls,
+      src: audio.src,
+      readyState: audio.readyState
+    });
+  }
+  
   document.getElementById('uploadBtn').addEventListener('click', upload);
   document.getElementById('narrateBtn').addEventListener('click', narrate);
   document.getElementById('nextBtn').addEventListener('click', nextSlide);
@@ -526,6 +850,23 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('toggleContentBtn').addEventListener('click', toggleContentMode);
   document.getElementById('regenerateSlidesBtn').addEventListener('click', regenerateSlides);
   
+  // Presenter mode controls
+  document.getElementById('toggleSlideView').addEventListener('click', toggleSlideView);
+  document.getElementById('toggleSlideZoom').addEventListener('click', toggleSlideZoom);
+  
+  // Manual audio controls
+  document.getElementById('manualPlayBtn').addEventListener('click', () => {
+    const audio = document.getElementById('audio');
+    if (audio && audio.src) {
+      audio.play().then(() => {
+        console.log('Manual play successful');
+        document.getElementById('manualPlayBtn').style.display = 'none';
+      }).catch(e => {
+        console.error('Manual play failed:', e);
+      });
+    }
+  });
+  
   // Add debug function to test slide loading
   window.debugSlides = async function() {
     if (presId) {
@@ -539,6 +880,35 @@ window.addEventListener('DOMContentLoaded', () => {
         return null;
       }
     }
+  };
+  
+  // Add debug function to test audio
+  window.testAudio = function() {
+    const audio = document.getElementById('audio');
+    if (!audio) {
+      console.error('Audio element not found');
+      return;
+    }
+    
+    console.log('Testing audio element...');
+    console.log('Audio src:', audio.src);
+    console.log('Audio readyState:', audio.readyState);
+    console.log('Audio networkState:', audio.networkState);
+    
+    // Try to set a test audio source
+    audio.src = `${window.BACKEND_BASE}/audio/tts_9753e21363344f34b199c0a61998c678.mp3`;
+    audio.load();
+    
+    audio.onloadstart = () => console.log('Audio load started');
+    audio.oncanplay = () => console.log('Audio can play');
+    audio.onerror = (e) => console.error('Audio error:', e);
+    
+    // Try to play
+    audio.play().then(() => {
+      console.log('Audio play successful');
+    }).catch(e => {
+      console.error('Audio play failed:', e);
+    });
   };
   
   // Modal controls
@@ -825,10 +1195,21 @@ PRESENTATION METADATA:
 
 function displaySlideImage(slide) {
   const imageContainer = document.getElementById('slideImageContainer');
-  const contentContainer = document.getElementById('slideContentContainer');
   const slideImage = document.getElementById('slideImage');
+  const slideLoading = document.getElementById('slideLoading');
+  const presenterStatus = document.getElementById('presenterStatus');
   
-  console.log('Displaying slide:', slide); // Debug log
+  console.log('Displaying slide in presenter mode:', slide); // Debug log
+  
+  // Show loading indicator
+  if (slideLoading) {
+    slideLoading.style.display = 'block';
+  }
+  
+  // Update presenter status
+  if (presenterStatus) {
+    presenterStatus.textContent = 'Loading original slide...';
+  }
   
   if (slide.image_path) {
     const imageUrl = `${window.BACKEND_BASE}${slide.image_path}`;
@@ -839,52 +1220,189 @@ function displaySlideImage(slide) {
     
     // Check if it's an HTML file
     if (slide.image_path.endsWith('.html')) {
-      // For HTML files, create an iframe
+      // For HTML files, create an iframe with enhanced styling
       const iframe = document.createElement('iframe');
       iframe.style.width = '100%';
-      iframe.style.height = '70vh';
+      iframe.style.height = '100%';
       iframe.style.border = 'none';
       iframe.style.borderRadius = '8px';
+      iframe.style.background = 'white';
       iframe.src = imageUrl;
       iframe.onload = () => {
         console.log('HTML slide loaded successfully:', imageUrl);
+        if (slideLoading) slideLoading.style.display = 'none';
+        if (presenterStatus) presenterStatus.textContent = 'Original slide loaded';
+        animateSlideEntry();
       };
       iframe.onerror = () => {
         console.error('Failed to load HTML slide:', imageUrl);
-        showImageError(imageContainer, 'Failed to load slide');
+        showImageError(imageContainer, 'Failed to load original slide');
+        if (slideLoading) slideLoading.style.display = 'none';
+        if (presenterStatus) presenterStatus.textContent = 'Slide load failed';
       };
       imageContainer.appendChild(iframe);
       console.log('Created iframe for HTML slide'); // Debug log
     } else {
-      // For image files, use img tag with error handling
+      // For image files, use img tag with enhanced error handling
       slideImage.onload = () => {
         console.log('Image loaded successfully:', imageUrl);
+        if (slideLoading) slideLoading.style.display = 'none';
+        if (presenterStatus) presenterStatus.textContent = 'Original slide loaded';
+        animateSlideEntry();
       };
       slideImage.onerror = () => {
         console.error('Failed to load image:', imageUrl);
-        showImageError(imageContainer, 'Failed to load slide image');
+        showImageError(imageContainer, 'Failed to load original slide');
+        if (slideLoading) slideLoading.style.display = 'none';
+        if (presenterStatus) presenterStatus.textContent = 'Slide load failed';
       };
       slideImage.src = imageUrl;
-      slideImage.alt = `Slide ${slide.slide_number || current + 1}`;
+      slideImage.alt = `Original PowerPoint Slide ${slide.slide_number || current + 1}`;
+      slideImage.style.display = 'block';
       imageContainer.appendChild(slideImage);
       console.log('Set image src:', imageUrl); // Debug log
     }
-    
-    // Show image container if in image mode
-    if (displayMode === 'image') {
-      imageContainer.style.display = 'block';
-      contentContainer.style.display = 'none';
-      console.log('Showing image container'); // Debug log
-    } else {
-      imageContainer.style.display = 'none';
-      contentContainer.style.display = 'block';
-      console.log('Showing content container'); // Debug log
-    }
   } else {
-    // No image available, show content only
-    imageContainer.style.display = 'none';
-    contentContainer.style.display = 'block';
-    console.log('No image path available, showing content only'); // Debug log
+    // No image available, show placeholder
+    if (slideLoading) slideLoading.style.display = 'none';
+    showImageError(imageContainer, 'No original slide available');
+    if (presenterStatus) presenterStatus.textContent = 'No slide available';
+  }
+  
+  // Also display the slide in the main content area for better visibility
+  displaySlideInMainContent(slide);
+}
+
+function displaySlideInMainContent(slide) {
+  const contentContainer = document.getElementById('slideContentContainer');
+  const slideContent = document.getElementById('slideContent');
+  
+  if (!contentContainer || !slideContent) {
+    console.error('Content containers not found');
+    return;
+  }
+  
+  // Clear existing content
+  slideContent.innerHTML = '';
+  
+  if (slide.image_path) {
+    const imageUrl = `${window.BACKEND_BASE}${slide.image_path}`;
+    console.log('Displaying slide in main content:', imageUrl);
+    
+    // Create a container for the slide display
+    const slideDisplayContainer = document.createElement('div');
+    slideDisplayContainer.className = 'main-slide-display';
+    slideDisplayContainer.style.cssText = `
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    `;
+    
+    if (slide.image_path.endsWith('.html')) {
+      // For HTML files, create an iframe
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = `
+        width: 100%;
+        height: 100%;
+        border: none;
+        border-radius: 8px;
+        background: white;
+      `;
+      iframe.src = imageUrl;
+      iframe.onload = () => {
+        console.log('Main content HTML slide loaded successfully:', imageUrl);
+      };
+      iframe.onerror = () => {
+        console.error('Failed to load main content HTML slide:', imageUrl);
+        slideDisplayContainer.innerHTML = '<div style="color: white; text-align: center; padding: 20px;">Failed to load slide</div>';
+      };
+      slideDisplayContainer.appendChild(iframe);
+    } else {
+      // For image files, use img tag
+      const img = document.createElement('img');
+      img.style.cssText = `
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      `;
+      img.src = imageUrl;
+      img.alt = `PowerPoint Slide ${slide.slide_number || current + 1}`;
+      img.onload = () => {
+        console.log('Main content image loaded successfully:', imageUrl);
+      };
+      img.onerror = () => {
+        console.error('Failed to load main content image:', imageUrl);
+        slideDisplayContainer.innerHTML = '<div style="color: white; text-align: center; padding: 20px;">Failed to load slide</div>';
+      };
+      slideDisplayContainer.appendChild(img);
+    }
+    
+    slideContent.appendChild(slideDisplayContainer);
+  } else {
+    // No slide image available, show text content as fallback
+    console.log('No slide image available, showing text content');
+    renderSlideContent(slide.content || '');
+  }
+}
+
+function animateSlideEntry() {
+  const slideImage = document.getElementById('slideImage');
+  if (slideImage) {
+    slideImage.style.opacity = '0';
+    slideImage.style.transform = 'scale(0.9)';
+    slideImage.style.transition = 'all 0.5s ease';
+    
+    setTimeout(() => {
+      slideImage.style.opacity = '1';
+      slideImage.style.transform = 'scale(1)';
+    }, 100);
+  }
+}
+
+function initializePresenterMode() {
+  // Ensure presenter mode is visible
+  const presenterMode = document.getElementById('presenterMode');
+  if (presenterMode) {
+    presenterMode.style.display = 'grid';
+  }
+  
+  // Initialize slide controls
+  const toggleSlideView = document.getElementById('toggleSlideView');
+  const toggleSlideZoom = document.getElementById('toggleSlideZoom');
+  
+  if (toggleSlideView) {
+    toggleSlideView.textContent = '🖼️ Full View';
+  }
+  
+  if (toggleSlideZoom) {
+    toggleSlideZoom.textContent = '🔍 Zoom';
+  }
+  
+  // Reset any existing zoom/pan
+  const slideImage = document.getElementById('slideImage');
+  if (slideImage) {
+    slideImage.style.transform = 'scale(1)';
+    slideImage.style.cursor = 'default';
+  }
+  
+  // Reset full view if active
+  const slideDisplay = document.getElementById('originalSlideDisplay');
+  if (slideDisplay && slideDisplay.style.position === 'fixed') {
+    slideDisplay.style.position = 'relative';
+    slideDisplay.style.top = 'auto';
+    slideDisplay.style.left = 'auto';
+    slideDisplay.style.width = '100%';
+    slideDisplay.style.height = '400px';
+    slideDisplay.style.zIndex = 'auto';
+    slideDisplay.style.background = '#000';
   }
 }
 
@@ -905,18 +1423,18 @@ function toggleDisplayMode() {
   const toggleContentBtn = document.getElementById('toggleContentBtn');
   
   if (displayMode === 'content') {
-    // Switch to image mode
+    // Switch to image mode - show PowerPoint slide
     displayMode = 'image';
     imageContainer.style.display = 'block';
     contentContainer.style.display = 'none';
-    toggleDisplayBtn.textContent = '🖼️ Hide Slide Image';
+    toggleDisplayBtn.textContent = '🖼️ Hide PowerPoint Slide';
     toggleContentBtn.textContent = '📝 Show Text Content';
   } else {
-    // Switch to content mode
+    // Switch to content mode - show extracted text
     displayMode = 'content';
     imageContainer.style.display = 'none';
     contentContainer.style.display = 'block';
-    toggleDisplayBtn.textContent = '🖼️ Show Slide Image';
+    toggleDisplayBtn.textContent = '🖼️ Show PowerPoint Slide';
     toggleContentBtn.textContent = '📝 Hide Text Content';
   }
 }
@@ -928,18 +1446,18 @@ function toggleContentMode() {
   const toggleContentBtn = document.getElementById('toggleContentBtn');
   
   if (displayMode === 'image') {
-    // Switch to content mode
+    // Switch to content mode - show extracted text
     displayMode = 'content';
     imageContainer.style.display = 'none';
     contentContainer.style.display = 'block';
-    toggleDisplayBtn.textContent = '🖼️ Show Slide Image';
+    toggleDisplayBtn.textContent = '🖼️ Show PowerPoint Slide';
     toggleContentBtn.textContent = '📝 Hide Text Content';
   } else {
-    // Switch to image mode
+    // Switch to image mode - show PowerPoint slide
     displayMode = 'image';
     imageContainer.style.display = 'block';
     contentContainer.style.display = 'none';
-    toggleDisplayBtn.textContent = '🖼️ Hide Slide Image';
+    toggleDisplayBtn.textContent = '🖼️ Hide PowerPoint Slide';
     toggleContentBtn.textContent = '📝 Show Text Content';
   }
 }
@@ -982,5 +1500,84 @@ async function regenerateSlides() {
   } finally {
     regenerateBtn.disabled = false;
     regenerateBtn.textContent = '🔄 Regenerate Slides';
+  }
+}
+
+// Presenter Mode Slide Controls
+function toggleSlideView() {
+  const slideDisplay = document.getElementById('originalSlideDisplay');
+  const toggleBtn = document.getElementById('toggleSlideView');
+  
+  if (slideDisplay && toggleBtn) {
+    if (slideDisplay.style.position === 'fixed') {
+      // Return to normal view
+      slideDisplay.style.position = 'relative';
+      slideDisplay.style.top = 'auto';
+      slideDisplay.style.left = 'auto';
+      slideDisplay.style.width = '100%';
+      slideDisplay.style.height = '400px';
+      slideDisplay.style.zIndex = 'auto';
+      slideDisplay.style.background = '#000';
+      toggleBtn.textContent = '🖼️ Full View';
+    } else {
+      // Enter full view mode
+      slideDisplay.style.position = 'fixed';
+      slideDisplay.style.top = '0';
+      slideDisplay.style.left = '0';
+      slideDisplay.style.width = '100vw';
+      slideDisplay.style.height = '100vh';
+      slideDisplay.style.zIndex = '9999';
+      slideDisplay.style.background = '#000';
+      toggleBtn.textContent = '📱 Normal View';
+    }
+  }
+}
+
+function toggleSlideZoom() {
+  const slideImage = document.getElementById('slideImage');
+  const zoomBtn = document.getElementById('toggleSlideZoom');
+  
+  if (slideImage && zoomBtn) {
+    if (slideImage.style.transform.includes('scale(1.5)')) {
+      // Reset zoom
+      slideImage.style.transform = 'scale(1)';
+      slideImage.style.cursor = 'default';
+      zoomBtn.textContent = '🔍 Zoom';
+    } else {
+      // Apply zoom
+      slideImage.style.transform = 'scale(1.5)';
+      slideImage.style.cursor = 'move';
+      zoomBtn.textContent = '🔍 Reset';
+      
+      // Add pan functionality when zoomed
+      let isPanning = false;
+      let startX, startY, currentX = 0, currentY = 0;
+      
+      slideImage.addEventListener('mousedown', (e) => {
+        isPanning = true;
+        startX = e.clientX - currentX;
+        startY = e.clientY - currentY;
+        slideImage.style.cursor = 'grabbing';
+      });
+      
+      slideImage.addEventListener('mousemove', (e) => {
+        if (isPanning) {
+          e.preventDefault();
+          currentX = e.clientX - startX;
+          currentY = e.clientY - startY;
+          slideImage.style.transform = `scale(1.5) translate(${currentX}px, ${currentY}px)`;
+        }
+      });
+      
+      slideImage.addEventListener('mouseup', () => {
+        isPanning = false;
+        slideImage.style.cursor = 'move';
+      });
+      
+      slideImage.addEventListener('mouseleave', () => {
+        isPanning = false;
+        slideImage.style.cursor = 'move';
+      });
+    }
   }
 }

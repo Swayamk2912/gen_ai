@@ -99,18 +99,30 @@ def get_presentation_meta(presentation_id: str):
 
 @app.post("/narrate")
 def narrate_slide(req: NarrationRequest):
+    print(f"Narrate request: presentation_id={req.presentation_id}, slide_index={req.slide_index}, tone={req.tone}, language={req.language}")
+    
     slides = get_slides(req.presentation_id)
     if req.slide_index < 0 or req.slide_index >= len(slides):
         raise HTTPException(status_code=404, detail="Slide not found")
 
     slide = slides[req.slide_index]
+    print(f"Processing slide: {slide.get('title', 'Untitled')}")
+    
     narration_data = generate_slide_narration(slide, slides, tone=req.tone, language=req.language)
     narration_text = narration_data["full_text"]
+    print(f"Generated narration text: '{narration_text[:100]}...'")
+    
     audio_path = synthesize_speech(narration_text, AUDIO_DIR, voice=req.voice, language=req.language)
+    print(f"Audio path: {audio_path}")
+    
     update_slide_audio(req.presentation_id, req.slide_index, narration_text, audio_path)
+    
+    audio_url = f"/audio/{os.path.basename(audio_path)}"
+    print(f"Returning audio_url: {audio_url}")
+    
     return {
         "text": narration_text, 
-        "audio_url": f"/audio/{os.path.basename(audio_path)}",
+        "audio_url": audio_url,
         "segments": narration_data["segments"]
     }
 
@@ -118,8 +130,15 @@ def narrate_slide(req: NarrationRequest):
 @app.get("/audio/{filename}")
 def get_audio(filename: str):
     path = os.path.join(AUDIO_DIR, filename)
+    print(f"Audio request: {filename} -> {path}")
+    
     if not os.path.exists(path):
+        print(f"Audio file not found: {path}")
         raise HTTPException(status_code=404, detail="Audio not found")
+    
+    file_size = os.path.getsize(path)
+    print(f"Audio file found: {path} (size: {file_size} bytes)")
+    
     return FileResponse(path, media_type="audio/mpeg")
 
 

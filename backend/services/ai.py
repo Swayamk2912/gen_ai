@@ -11,31 +11,282 @@ def _format_slide_context(slide: Dict, slides: List[Dict]) -> str:
 
 
 def generate_slide_narration(slide: Dict, slides: List[Dict], tone: str = "formal", language: str = "en") -> Dict:
-    """Generate slide narration with proper multi-language support"""
+    """Generate slide narration with proper page-by-page synchronization"""
     
-    # Get the base narration template in the target language
-    base_template = translation_service.translate_narration_template("", tone, language)
+    # Extract structured slide content
+    slide_structure = _analyze_slide_structure(slide, language)
     
-    # Get slide content
-    slide_content = slide.get("content") or "This slide contains bullet points that I will explain succinctly."
+    # Generate structured narration based on slide elements
+    narration_parts = _generate_structured_narration(slide_structure, tone, language)
     
-    # If target language is not English, translate the slide content
-    if language != "en":
-        slide_content = translation_service.translate_text(slide_content, language)
+    # Create segments with proper timing for each slide element
+    segments = _create_synchronized_segments(narration_parts, slide_structure, language)
     
-    # Combine template with content
-    narration = f"{base_template} {slide_content}"
-    
-    # Split narration into segments for synchronization
-    segments = _split_narration_into_segments(narration[:3000], slide.get("content", ""), language)
+    # Combine all narration parts
+    full_narration = " ".join([part["text"] for part in narration_parts])
     
     return {
-        "full_text": narration[:3000],
+        "full_text": full_narration[:3000],
         "segments": segments,
         "language": language,
-        "tone": tone
+        "tone": tone,
+        "slide_structure": slide_structure
     }
 
+
+def _analyze_slide_structure(slide: Dict, language: str = "en") -> Dict:
+    """Analyze slide content and extract structured elements for narration"""
+    import re
+    
+    title = slide.get("title", "").strip()
+    content = slide.get("content", "").strip()
+    
+    # If target language is not English, translate the content
+    if language != "en":
+        title = translation_service.translate_text(title, language) if title else ""
+        content = translation_service.translate_text(content, language) if content else ""
+    
+    # Extract different types of content
+    lines = [line.strip() for line in content.split('\n') if line.strip()]
+    
+    # Categorize content elements
+    elements = {
+        "title": title,
+        "bullet_points": [],
+        "paragraphs": [],
+        "headings": [],
+        "lists": []
+    }
+    
+    for line in lines:
+        # Check for bullet points
+        if any(line.startswith(prefix) for prefix in ['•', '-', '*', '◦', '▪', '▫']):
+            clean_text = re.sub(r'^[•\-*◦▪▫\s]+', '', line).strip()
+            if clean_text:
+                elements["bullet_points"].append(clean_text)
+        # Check for headings (short lines, often in caps or title case)
+        elif len(line) < 80 and (line.isupper() or line.istitle()):
+            elements["headings"].append(line)
+        # Check for numbered lists
+        elif re.match(r'^\d+[\.\)]\s+', line):
+            clean_text = re.sub(r'^\d+[\.\)]\s+', '', line).strip()
+            if clean_text:
+                elements["lists"].append(clean_text)
+        # Check for short lines that should be treated as bullet points even without symbols
+        elif len(line.split()) <= 8 and not line.endswith('.') and not line.endswith(':'):
+            elements["bullet_points"].append(line)
+        # Regular paragraphs (longer content)
+        else:
+            elements["paragraphs"].append(line)
+    
+    return elements
+
+def _generate_structured_narration(slide_structure: Dict, tone: str, language: str) -> List[Dict]:
+    """Generate structured narration parts based on slide elements"""
+    
+    narration_parts = []
+    
+    # Generate title narration
+    if slide_structure["title"]:
+        title_narration = _generate_title_narration(slide_structure["title"], tone, language)
+        narration_parts.append({
+            "type": "title",
+            "text": title_narration,
+            "element": slide_structure["title"]
+        })
+    
+    # Generate heading narrations
+    for heading in slide_structure["headings"]:
+        heading_narration = _generate_heading_narration(heading, tone, language)
+        narration_parts.append({
+            "type": "heading",
+            "text": heading_narration,
+            "element": heading
+        })
+    
+    # Generate bullet point narrations
+    for i, bullet in enumerate(slide_structure["bullet_points"]):
+        bullet_narration = _generate_bullet_narration(bullet, i + 1, len(slide_structure["bullet_points"]), tone, language)
+        narration_parts.append({
+            "type": "bullet",
+            "text": bullet_narration,
+            "element": bullet,
+            "index": i + 1
+        })
+    
+    # Generate list narrations
+    for i, list_item in enumerate(slide_structure["lists"]):
+        list_narration = _generate_list_narration(list_item, i + 1, len(slide_structure["lists"]), tone, language)
+        narration_parts.append({
+            "type": "list",
+            "text": list_narration,
+            "element": list_item,
+            "index": i + 1
+        })
+    
+    # Generate paragraph narrations
+    for paragraph in slide_structure["paragraphs"]:
+        paragraph_narration = _generate_paragraph_narration(paragraph, tone, language)
+        narration_parts.append({
+            "type": "paragraph",
+            "text": paragraph_narration,
+            "element": paragraph
+        })
+    
+    return narration_parts
+
+def _generate_title_narration(title: str, tone: str, language: str) -> str:
+    """Generate narration for slide title"""
+    templates = {
+        'en': {
+            'formal': f"{title}.",
+            'friendly': f"{title}.",
+            'academic': f"{title}.",
+            'humorous': f"{title}!"
+        },
+        'hi': {
+            'formal': f"{title}।",
+            'friendly': f"{title}।",
+            'academic': f"{title}।",
+            'humorous': f"{title}!"
+        },
+        'es': {
+            'formal': f"{title}.",
+            'friendly': f"{title}.",
+            'academic': f"{title}.",
+            'humorous': f"{title}!"
+        }
+    }
+    
+    if language in templates:
+        return templates[language].get(tone, templates[language]['formal'])
+    else:
+        english_template = templates['en'].get(tone, templates['en']['formal'])
+        return translation_service.translate_text(english_template, language)
+
+def _generate_heading_narration(heading: str, tone: str, language: str) -> str:
+    """Generate narration for slide headings"""
+    templates = {
+        'en': {
+            'formal': f"{heading}.",
+            'friendly': f"{heading}.",
+            'academic': f"{heading}.",
+            'humorous': f"{heading}!"
+        }
+    }
+    
+    if language in templates:
+        return templates[language].get(tone, templates[language]['formal'])
+    else:
+        english_template = templates['en'].get(tone, templates['en']['formal'])
+        return translation_service.translate_text(english_template, language)
+
+def _generate_bullet_narration(bullet: str, index: int, total: int, tone: str, language: str) -> str:
+    """Generate narration for bullet points with proper sequencing"""
+    templates = {
+        'en': {
+            'formal': f"Point {index}: {bullet}.",
+            'friendly': f"Here's point {index}: {bullet}.",
+            'academic': f"Item {index} states: {bullet}.",
+            'humorous': f"Bullet {index} says: {bullet}!"
+        }
+    }
+    
+    if language in templates:
+        base_template = templates[language].get(tone, templates[language]['formal'])
+    else:
+        english_template = templates['en'].get(tone, templates['en']['formal'])
+        base_template = translation_service.translate_text(english_template, language)
+    
+    return base_template.format(index=index, bullet=bullet)
+
+def _generate_list_narration(list_item: str, index: int, total: int, tone: str, language: str) -> str:
+    """Generate narration for numbered list items"""
+    templates = {
+        'en': {
+            'formal': f"Number {index}: {list_item}.",
+            'friendly': f"Here's number {index}: {list_item}.",
+            'academic': f"Step {index}: {list_item}.",
+            'humorous': f"Item {index} is: {list_item}!"
+        }
+    }
+    
+    if language in templates:
+        base_template = templates[language].get(tone, templates[language]['formal'])
+    else:
+        english_template = templates['en'].get(tone, templates['en']['formal'])
+        base_template = translation_service.translate_text(english_template, language)
+    
+    return base_template.format(index=index, item=list_item)
+
+def _generate_paragraph_narration(paragraph: str, tone: str, language: str) -> str:
+    """Generate narration for paragraph content"""
+    
+    # For all paragraphs, just state them directly without "let me explain"
+    templates = {
+        'en': {
+            'formal': f"{paragraph}.",
+            'friendly': f"{paragraph}.",
+            'academic': f"{paragraph}.",
+            'humorous': f"{paragraph}!"
+        }
+    }
+    
+    if language in templates:
+        return templates[language].get(tone, templates[language]['formal'])
+    else:
+        english_template = templates['en'].get(tone, templates['en']['formal'])
+        return translation_service.translate_text(english_template, language)
+
+def _create_synchronized_segments(narration_parts: List[Dict], slide_structure: Dict, language: str) -> List[Dict]:
+    """Create synchronized segments with proper timing for each slide element"""
+    
+    segments = []
+    current_time = 0
+    
+    # Language-specific timing adjustments
+    words_per_minute = {
+        'en': 150, 'hi': 140, 'es': 160, 'fr': 155, 'de': 145, 
+        'it': 160, 'pt': 155, 'ru': 140, 'ja': 130, 'ko': 140,
+        'zh': 130, 'ar': 135, 'nl': 150, 'sv': 150, 'no': 150,
+        'da': 150, 'fi': 140, 'pl': 140, 'tr': 145, 'th': 130, 'vi': 140
+    }
+    
+    wpm = words_per_minute.get(language, 150)
+    seconds_per_word = 60 / wpm
+    
+    for part in narration_parts:
+        text = part["text"]
+        word_count = len(text.split())
+        
+        # Adjust duration based on content type
+        base_duration = max(1, word_count * seconds_per_word)
+        
+        # Add extra time for different content types
+        if part["type"] == "title":
+            duration = base_duration + 1.0  # Pause after title
+        elif part["type"] == "heading":
+            duration = base_duration + 0.5  # Brief pause after heading
+        elif part["type"] == "bullet":
+            duration = base_duration + 0.3  # Short pause between bullets
+        elif part["type"] == "list":
+            duration = base_duration + 0.4  # Medium pause between list items
+        else:
+            duration = base_duration
+        
+        segments.append({
+            "text": text,
+            "start_time": current_time,
+            "duration": duration,
+            "end_time": current_time + duration,
+            "highlight_text": part["element"],
+            "type": part["type"],
+            "language": language
+        })
+        
+        current_time += duration
+    
+    return segments
 
 def _split_narration_into_segments(narration: str, slide_content: str, language: str = "en") -> List[Dict]:
     """Split narration into segments with timing estimates for synchronization"""
