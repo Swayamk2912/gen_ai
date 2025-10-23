@@ -10,6 +10,9 @@ let currentSegment = 0;
 let supportedLanguages = {};
 let summaryReport = null;
 let displayMode = 'content'; // 'content' or 'image'
+let audioContext = null;
+let audioAnalyser = null;
+let audioSource = null;
 
 async function upload() {
   const fileInput = document.getElementById('pptFile');
@@ -87,6 +90,9 @@ function render() {
   
   // Initialize presenter mode
   initializePresenterMode();
+  
+  // Initialize regenerate slides button
+  initializeRegenerateButton();
   
   if (s.audio_path) {
     const file = s.audio_path.split('/').pop();
@@ -179,6 +185,8 @@ function clearSyncInterval() {
     clearInterval(syncInterval);
     syncInterval = null;
   }
+  // Also cleanup audio visualization when clearing sync
+  cleanupAudioVisualization();
 }
 
 function startSyncWithAudio(segments) {
@@ -304,8 +312,8 @@ function startPresentationMode() {
         speakingIndicator.style.display = 'flex';
       }
       
-      // Start audio visualization
-      startAudioVisualization();
+        // Start audio visualization (temporarily disabled to test audio)
+        // startAudioVisualization();
     }).catch(error => {
       console.error('Auto-play failed:', error);
     });
@@ -318,23 +326,26 @@ function startAudioVisualization() {
   
   if (!audio || !waveform) return;
   
+  // Clean up existing audio context if it exists
+  cleanupAudioVisualization();
+  
   // Create audio context for visualization
   try {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const analyser = audioContext.createAnalyser();
-    const source = audioContext.createMediaElementSource(audio);
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    audioAnalyser = audioContext.createAnalyser();
+    audioSource = audioContext.createMediaElementSource(audio);
     
-    source.connect(analyser);
-    analyser.connect(audioContext.destination);
+    audioSource.connect(audioAnalyser);
+    audioAnalyser.connect(audioContext.destination);
     
-    analyser.fftSize = 256;
-    const bufferLength = analyser.frequencyBinCount;
+    audioAnalyser.fftSize = 256;
+    const bufferLength = audioAnalyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
     
     function visualize() {
-      if (!isPlaying) return;
+      if (!isPlaying || !audioAnalyser) return;
       
-      analyser.getByteFrequencyData(dataArray);
+      audioAnalyser.getByteFrequencyData(dataArray);
       
       // Create simple waveform visualization
       const bars = Math.min(20, bufferLength);
@@ -354,9 +365,22 @@ function startAudioVisualization() {
     visualize();
   } catch (error) {
     console.log('Audio visualization not available:', error);
-    // Fallback to static visualization
+    // Fallback to static visualization - but don't let this block audio playback
     waveform.innerHTML = '<div style="width: 100%; height: 100%; background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 50%, var(--success) 100%); border-radius: 10px; animation: waveform-pulse 2s infinite;"></div>';
   }
+}
+
+function cleanupAudioVisualization() {
+  if (audioContext) {
+    try {
+      audioContext.close();
+    } catch (e) {
+      console.log('Error closing audio context:', e);
+    }
+    audioContext = null;
+  }
+  audioAnalyser = null;
+  audioSource = null;
 }
 
 function animateSlideContent() {
@@ -545,8 +569,8 @@ async function narrate() {
           speakingIndicator.style.display = 'flex';
         }
         
-        // Start audio visualization
-        startAudioVisualization();
+        // Start audio visualization (temporarily disabled to test audio)
+        // startAudioVisualization();
         
         // Start synchronization if segments are available
         if (data.segments && data.segments.length > 0) {
@@ -571,6 +595,9 @@ async function narrate() {
         if (speakingIndicator) {
           speakingIndicator.style.display = 'none';
         }
+        
+        // Cleanup audio visualization
+        cleanupAudioVisualization();
       };
       
       audio.onended = () => {
@@ -591,6 +618,9 @@ async function narrate() {
           speakingIndicator.style.display = 'none';
         }
         
+        // Cleanup audio visualization
+        cleanupAudioVisualization();
+        
         showQAModal();
       };
       
@@ -603,6 +633,13 @@ async function narrate() {
         paused: audio.paused,
         duration: audio.duration
       });
+      
+      // Add more detailed debugging
+      audio.addEventListener('loadstart', () => console.log('Audio loadstart event'));
+      audio.addEventListener('loadeddata', () => console.log('Audio loadeddata event'));
+      audio.addEventListener('canplay', () => console.log('Audio canplay event'));
+      audio.addEventListener('canplaythrough', () => console.log('Audio canplaythrough event'));
+      audio.addEventListener('error', (e) => console.error('Audio error event:', e));
       
       try {
         await audio.play();
@@ -645,7 +682,7 @@ function nextSlide() {
     audio.currentTime = 0;
   }
   
-  // Clear synchronization
+  // Clear synchronization and cleanup audio visualization
   clearSyncInterval();
   
   // Reset audio state
@@ -668,7 +705,7 @@ function prevSlide() {
     audio.currentTime = 0;
   }
   
-  // Clear synchronization
+  // Clear synchronization and cleanup audio visualization
   clearSyncInterval();
   
   // Reset audio state
@@ -908,6 +945,24 @@ window.addEventListener('DOMContentLoaded', () => {
       console.log('Audio play successful');
     }).catch(e => {
       console.error('Audio play failed:', e);
+    });
+  };
+  
+  // Add simple audio test function
+  window.testSimpleAudio = function() {
+    const audio = document.getElementById('audio');
+    if (!audio) {
+      console.error('Audio element not found');
+      return;
+    }
+    
+    console.log('Simple audio test - setting source and playing...');
+    audio.src = `${window.BACKEND_BASE}/audio/tts_9753e21363344f34b199c0a61998c678.mp3`;
+    
+    audio.play().then(() => {
+      console.log('✅ Simple audio test SUCCESSFUL - audio is playing!');
+    }).catch(e => {
+      console.error('❌ Simple audio test FAILED:', e);
     });
   };
   
@@ -1208,7 +1263,7 @@ function displaySlideImage(slide) {
   
   // Update presenter status
   if (presenterStatus) {
-    presenterStatus.textContent = 'Loading original slide...';
+    presenterStatus.textContent = 'Loading original PowerPoint slide...';
   }
   
   if (slide.image_path) {
@@ -1231,7 +1286,7 @@ function displaySlideImage(slide) {
       iframe.onload = () => {
         console.log('HTML slide loaded successfully:', imageUrl);
         if (slideLoading) slideLoading.style.display = 'none';
-        if (presenterStatus) presenterStatus.textContent = 'Original slide loaded';
+        if (presenterStatus) presenterStatus.textContent = 'Original PowerPoint slide loaded';
         animateSlideEntry();
       };
       iframe.onerror = () => {
@@ -1247,7 +1302,7 @@ function displaySlideImage(slide) {
       slideImage.onload = () => {
         console.log('Image loaded successfully:', imageUrl);
         if (slideLoading) slideLoading.style.display = 'none';
-        if (presenterStatus) presenterStatus.textContent = 'Original slide loaded';
+        if (presenterStatus) presenterStatus.textContent = 'Original PowerPoint slide loaded';
         animateSlideEntry();
       };
       slideImage.onerror = () => {
@@ -1350,6 +1405,52 @@ function displaySlideInMainContent(slide) {
     // No slide image available, show text content as fallback
     console.log('No slide image available, showing text content');
     renderSlideContent(slide.content || '');
+  }
+}
+
+function initializeRegenerateButton() {
+  const regenerateBtn = document.getElementById('regenerateSlides');
+  if (regenerateBtn) {
+    regenerateBtn.addEventListener('click', async () => {
+      if (!presentationId) {
+        alert('No presentation loaded');
+        return;
+      }
+      
+      const confirmed = confirm('This will regenerate all slides with enhanced quality. Continue?');
+      if (!confirmed) return;
+      
+      try {
+        regenerateBtn.disabled = true;
+        regenerateBtn.textContent = '🔄 Enhancing...';
+        
+        const response = await fetch(`${window.BACKEND_BASE}/regenerate-slides-enhanced/${presentationId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Slides regenerated:', result);
+          
+          // Reload the presentation to get updated slides
+          await loadPresentation();
+          
+          alert('Slides have been enhanced with better quality!');
+        } else {
+          const error = await response.json();
+          alert(`Failed to enhance slides: ${error.detail}`);
+        }
+      } catch (error) {
+        console.error('Error regenerating slides:', error);
+        alert('Failed to enhance slides. Please try again.');
+      } finally {
+        regenerateBtn.disabled = false;
+        regenerateBtn.textContent = '🔄 Enhance Quality';
+      }
+    });
   }
 }
 

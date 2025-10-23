@@ -402,7 +402,7 @@ button:disabled:hover {
   gap: 8px;
 }
 
-.slide-view-btn, .slide-zoom-btn {
+.slide-view-btn, .slide-zoom-btn, .regenerate-btn {
   background: var(--primary);
   color: #000;
   border: none;
@@ -414,9 +414,19 @@ button:disabled:hover {
   transition: all 0.2s ease;
 }
 
-.slide-view-btn:hover, .slide-zoom-btn:hover {
-  background: var(--primary-600);
-  transform: translateY(-1px);
+.regenerate-btn {
+  background: var(--accent);
+  color: #000;
+}
+
+.regenerate-btn:hover {
+  background: #a875ff;
+}
+
+.regenerate-btn:disabled {
+  background: var(--muted);
+  cursor: not-allowed;
+  transform: none;
 }
 
 .original-slide-display {

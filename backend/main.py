@@ -198,6 +198,43 @@ def debug_slides(presentation_id: str):
         raise HTTPException(status_code=500, detail=f"Debug failed: {str(e)}")
 
 
+@app.post("/regenerate-slides-enhanced/{presentation_id}")
+def regenerate_slides_enhanced(presentation_id: str):
+    """Regenerate slide images with enhanced quality for an existing presentation"""
+    try:
+        from .services.ppt_parser import parse_presentation
+        
+        # Get presentation info
+        pres = get_presentation(presentation_id)
+        if not pres:
+            raise HTTPException(status_code=404, detail="Presentation not found")
+        
+        # Find the original file
+        upload_dir = os.path.join(os.getcwd(), "uploads")
+        original_files = [f for f in os.listdir(upload_dir) if f.startswith(presentation_id)]
+        
+        if not original_files:
+            raise HTTPException(status_code=404, detail="Original presentation file not found")
+        
+        original_file = os.path.join(upload_dir, original_files[0])
+        
+        # Re-parse the presentation to regenerate slide images with enhanced quality
+        slides_data = parse_presentation(original_file)
+        
+        # Update database with new slide data
+        for idx, slide in enumerate(slides_data):
+            save_slide(presentation_id, idx, slide)
+        
+        return {
+            "message": "Slides regenerated with enhanced quality successfully",
+            "slides_count": len(slides_data),
+            "slides": slides_data
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Enhanced regeneration failed: {str(e)}")
+
+
 @app.post("/regenerate-slides/{presentation_id}")
 def regenerate_slides(presentation_id: str):
     """Regenerate slide images for an existing presentation"""

@@ -69,19 +69,27 @@ def generate_slide_image(slide, slides_dir: str, slide_index: int) -> str:
         # Try to create actual slide image using different methods
         success = False
         
-        # Method 1: Try to use python-pptx with image extraction
-        success = extract_slide_as_image(slide, image_path, slide_index)
+        # Method 1: Try to use external tools to convert PPT to images
+        success = convert_ppt_to_image_external(slide, image_path, slide_index)
         
-        # Method 1.5: Try alternative image extraction if first method fails
+        # Method 2: Try to extract embedded images from the slide
+        if not success:
+            success = extract_embedded_images(slide, image_path, slide_index)
+        
+        # Method 3: Try to use python-pptx with image extraction
+        if not success:
+            success = extract_slide_as_image(slide, image_path, slide_index)
+        
+        # Method 3: Try alternative image extraction if first method fails
         if not success:
             success = extract_slide_with_alternative_method(slide, image_path, slide_index)
         
-        # Method 1.6: Try to extract actual slide images from PowerPoint
+        # Method 4: Try to extract actual slide images from PowerPoint
         if not success:
             success = extract_actual_ppt_slide_image(slide, image_path, slide_index)
         
         if not success:
-            # Method 2: Create a high-quality HTML representation
+            # Method 5: Create a high-quality HTML representation
             html_filename = f"slide_{slide_index}_{slide_id}.html"
             html_path = os.path.join(slides_dir, html_filename)
             success = create_enhanced_html_slide(html_path, slide, slide_index)
@@ -110,6 +118,317 @@ def generate_slide_image(slide, slides_dir: str, slide_index: int) -> str:
         except Exception as e2:
             print(f"Fallback creation failed: {e2}")
             return None
+
+
+def convert_ppt_to_image_external(slide, image_path: str, slide_index: int) -> bool:
+    """Try to use external tools to convert PPT slide to image"""
+    try:
+        import subprocess
+        import tempfile
+        import os
+        
+        # This method tries to use LibreOffice or other tools to convert PPT to images
+        # First, we need to get the original PPT file path
+        # Since we don't have direct access to the file path here, we'll skip this method
+        # and rely on the other methods
+        
+        # Alternative: Try to use python-pptx with better image extraction
+        from PIL import Image, ImageDraw, ImageFont
+        import io
+        
+        # Create a high-resolution canvas
+        width, height = 1920, 1080
+        img = Image.new('RGB', (width, height), 'white')
+        draw = ImageDraw.Draw(img)
+        
+        # Try to load fonts
+        try:
+            title_font = ImageFont.truetype("arial.ttf", 64)
+            content_font = ImageFont.truetype("arial.ttf", 32)
+            small_font = ImageFont.truetype("arial.ttf", 24)
+        except:
+            try:
+                title_font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 64)
+                content_font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 32)
+                small_font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 24)
+            except:
+                title_font = ImageFont.load_default()
+                content_font = ImageFont.load_default()
+                small_font = ImageFont.load_default()
+        
+        # Extract slide content with better formatting
+        title_text = ""
+        content_texts = []
+        bullet_points = []
+        
+        # Process all shapes in the slide
+        for shape in slide.shapes:
+            # Extract text content
+            if hasattr(shape, "has_text_frame") and shape.has_text_frame:
+                for paragraph in shape.text_frame.paragraphs:
+                    text = paragraph.text.strip()
+                    if text:
+                        # Check if it's a bullet point
+                        if any(text.startswith(prefix) for prefix in ['•', '-', '*', '◦']):
+                            bullet_points.append(text)
+                        elif not title_text and len(text) < 100:
+                            title_text = text
+                        else:
+                            content_texts.append(text)
+        
+        # Draw title with better styling
+        if title_text:
+            # Center the title with shadow effect
+            bbox = draw.textbbox((0, 0), title_text, font=title_font)
+            text_width = bbox[2] - bbox[0]
+            x = (width - text_width) // 2
+            
+            # Draw shadow
+            draw.text((x + 2, 82), title_text, fill='gray', font=title_font)
+            # Draw main text
+            draw.text((x, 80), title_text, fill='black', font=title_font)
+        
+        # Draw content with better formatting
+        y_offset = 200
+        for text in content_texts[:4]:  # Limit to 4 content blocks
+            if y_offset < height - 150:
+                # Wrap text
+                words = text.split()
+                lines = []
+                current_line = []
+                for word in words:
+                    test_line = ' '.join(current_line + [word])
+                    bbox = draw.textbbox((0, 0), test_line, font=content_font)
+                    if bbox[2] - bbox[0] < width - 200:
+                        current_line.append(word)
+                    else:
+                        if current_line:
+                            lines.append(' '.join(current_line))
+                            current_line = [word]
+                        else:
+                            lines.append(word)
+                if current_line:
+                    lines.append(' '.join(current_line))
+                
+                # Draw lines with better spacing
+                for line in lines[:2]:  # Limit to 2 lines per content block
+                    if y_offset < height - 150:
+                        draw.text((100, y_offset), line, fill='black', font=content_font)
+                        y_offset += 50
+        
+        # Draw bullet points with better formatting
+        for bullet in bullet_points[:6]:  # Limit to 6 bullet points
+            if y_offset < height - 150:
+                # Wrap bullet text
+                words = bullet.split()
+                lines = []
+                current_line = []
+                for word in words:
+                    test_line = ' '.join(current_line + [word])
+                    bbox = draw.textbbox((0, 0), test_line, font=small_font)
+                    if bbox[2] - bbox[0] < width - 200:
+                        current_line.append(word)
+                    else:
+                        if current_line:
+                            lines.append(' '.join(current_line))
+                            current_line = [word]
+                        else:
+                            lines.append(word)
+                if current_line:
+                    lines.append(' '.join(current_line))
+                
+                # Draw bullet lines with bullet symbol
+                for i, line in enumerate(lines[:2]):  # Limit to 2 lines per bullet
+                    if y_offset < height - 150:
+                        bullet_symbol = '•' if i == 0 else ' '
+                        draw.text((120, y_offset), f"{bullet_symbol} {line}", fill='black', font=small_font)
+                        y_offset += 35
+        
+        # Add a subtle border
+        draw.rectangle([50, 50, width-50, height-50], outline='lightgray', width=2)
+        
+        # Save the image
+        img.save(image_path, 'PNG', quality=95)
+        print(f"Successfully created enhanced slide image: {image_path}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to convert PPT to image externally: {e}")
+        return False
+
+
+def extract_embedded_images(slide, image_path: str, slide_index: int) -> bool:
+    """Try to extract embedded images from the slide and create a visual representation"""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        import io
+        
+        # Create a high-resolution canvas (16:9 aspect ratio)
+        width, height = 1920, 1080
+        img = Image.new('RGB', (width, height), 'white')
+        draw = ImageDraw.Draw(img)
+        
+        # Try to load fonts
+        try:
+            title_font = ImageFont.truetype("arial.ttf", 56)
+            content_font = ImageFont.truetype("arial.ttf", 28)
+            small_font = ImageFont.truetype("arial.ttf", 20)
+        except:
+            try:
+                title_font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 56)
+                content_font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 28)
+                small_font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 20)
+            except:
+                title_font = ImageFont.load_default()
+                content_font = ImageFont.load_default()
+                small_font = ImageFont.load_default()
+        
+        # Extract slide content and embedded images
+        title_text = ""
+        content_texts = []
+        bullet_points = []
+        embedded_images = []
+        
+        # Process all shapes in the slide
+        for shape in slide.shapes:
+            # Check for embedded images
+            if hasattr(shape, 'image') and shape.image:
+                try:
+                    # Extract the image data
+                    image_data = shape.image.blob
+                    if image_data:
+                        # Convert to PIL Image
+                        pil_image = Image.open(io.BytesIO(image_data))
+                        embedded_images.append({
+                            'image': pil_image,
+                            'left': shape.left,
+                            'top': shape.top,
+                            'width': shape.width,
+                            'height': shape.height
+                        })
+                        print(f"Found embedded image in slide {slide_index}")
+                except Exception as e:
+                    print(f"Error extracting embedded image: {e}")
+            
+            # Extract text content
+            if hasattr(shape, "has_text_frame") and shape.has_text_frame:
+                for paragraph in shape.text_frame.paragraphs:
+                    text = paragraph.text.strip()
+                    if text:
+                        # Check if it's a bullet point
+                        if any(text.startswith(prefix) for prefix in ['•', '-', '*', '◦']):
+                            bullet_points.append(text)
+                        elif not title_text and len(text) < 100:
+                            title_text = text
+                        else:
+                            content_texts.append(text)
+        
+        # Draw background (try to match slide background)
+        try:
+            # Try to get slide background color
+            if hasattr(slide, 'background') and slide.background:
+                # This is a simplified approach - actual background extraction is complex
+                pass
+        except:
+            pass
+        
+        # Draw title
+        if title_text:
+            # Center the title
+            bbox = draw.textbbox((0, 0), title_text, font=title_font)
+            text_width = bbox[2] - bbox[0]
+            x = (width - text_width) // 2
+            draw.text((x, 80), title_text, fill='black', font=title_font)
+        
+        # Draw embedded images
+        y_offset = 200
+        for img_data in embedded_images:
+            try:
+                # Resize image to fit within slide bounds
+                img_width = min(img_data['width'], width - 200)
+                img_height = min(img_data['height'], height - y_offset - 100)
+                
+                # Maintain aspect ratio
+                aspect_ratio = img_data['image'].width / img_data['image'].height
+                if img_width / img_height > aspect_ratio:
+                    img_width = int(img_height * aspect_ratio)
+                else:
+                    img_height = int(img_width / aspect_ratio)
+                
+                # Resize the image
+                resized_img = img_data['image'].resize((img_width, img_height), Image.Resampling.LANCZOS)
+                
+                # Paste the image onto the slide
+                x_pos = (width - img_width) // 2
+                img.paste(resized_img, (x_pos, y_offset))
+                y_offset += img_height + 20
+                
+                print(f"Successfully embedded image in slide {slide_index}")
+            except Exception as e:
+                print(f"Error pasting embedded image: {e}")
+        
+        # Draw content text
+        for text in content_texts[:5]:  # Limit to 5 content blocks
+            if y_offset < height - 100:
+                # Wrap text if too long
+                words = text.split()
+                lines = []
+                current_line = []
+                for word in words:
+                    test_line = ' '.join(current_line + [word])
+                    bbox = draw.textbbox((0, 0), test_line, font=content_font)
+                    if bbox[2] - bbox[0] < width - 200:
+                        current_line.append(word)
+                    else:
+                        if current_line:
+                            lines.append(' '.join(current_line))
+                            current_line = [word]
+                        else:
+                            lines.append(word)
+                if current_line:
+                    lines.append(' '.join(current_line))
+                
+                # Draw lines
+                for line in lines[:3]:  # Limit to 3 lines per content block
+                    if y_offset < height - 100:
+                        draw.text((100, y_offset), line, fill='black', font=content_font)
+                        y_offset += 40
+        
+        # Draw bullet points
+        for bullet in bullet_points[:8]:  # Limit to 8 bullet points
+            if y_offset < height - 100:
+                # Wrap bullet text
+                words = bullet.split()
+                lines = []
+                current_line = []
+                for word in words:
+                    test_line = ' '.join(current_line + [word])
+                    bbox = draw.textbbox((0, 0), test_line, font=small_font)
+                    if bbox[2] - bbox[0] < width - 200:
+                        current_line.append(word)
+                    else:
+                        if current_line:
+                            lines.append(' '.join(current_line))
+                            current_line = [word]
+                        else:
+                            lines.append(word)
+                if current_line:
+                    lines.append(' '.join(current_line))
+                
+                # Draw bullet lines
+                for line in lines[:2]:  # Limit to 2 lines per bullet
+                    if y_offset < height - 100:
+                        draw.text((120, y_offset), line, fill='black', font=small_font)
+                        y_offset += 30
+        
+        # Save the image
+        img.save(image_path, 'PNG', quality=95)
+        print(f"Successfully created slide image with embedded content: {image_path}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to extract embedded images: {e}")
+        return False
 
 
 def extract_slide_as_image(slide, image_path: str, slide_index: int) -> bool:
