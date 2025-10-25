@@ -21,7 +21,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
 COPY backend/ ./backend/
-COPY rag.py ./rag.py
+
+# Copy frontend code
+COPY frontend/ ./frontend/
+
 
 # Create necessary directories
 RUN mkdir -p uploads audio slides data

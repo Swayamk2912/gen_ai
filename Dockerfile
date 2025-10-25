@@ -20,7 +20,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
 COPY backend/ ./backend/
-COPY rag.py ./rag.py
 
 # Create necessary directories
 RUN mkdir -p uploads audio slides data
@@ -46,7 +45,7 @@ FROM nginx:alpine as frontend
 COPY frontend/ /usr/share/nginx/html/
 
 # Copy nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port
 EXPOSE 80
@@ -78,13 +77,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
-COPY rag.py ./rag.py
 
 # Create necessary directories
 RUN mkdir -p uploads audio slides data /var/log/nginx
 
 # Copy nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Set environment variables
 ENV PYTHONPATH=/app
