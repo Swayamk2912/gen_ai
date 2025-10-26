@@ -425,39 +425,39 @@ def _get_answer_templates(language: str, tone: str) -> Dict[str, str]:
     
     templates = {
         'en': {
-            'what': "Based on slide '{title}': {content}",
-            'how': "According to slide '{title}', here's how it works: {content}",
-            'why': "Slide '{title}' explains why: {content}",
-            'explain': "This slide '{title}' explains:\n{content}",
-            'general': "From slide '{title}':\n{content}"
+            'what': "{content}",
+            'how': "{content}",
+            'why': "{content}",
+            'explain': "{content}",
+            'general': "{content}"
         },
         'hi': {
-            'what': "स्लाइड '{title}' के अनुसार: {content}",
-            'how': "स्लाइड '{title}' के अनुसार, यह कैसे काम करता है: {content}",
-            'why': "स्लाइड '{title}' बताती है कि क्यों: {content}",
-            'explain': "यह स्लाइड '{title}' समझाती है:\n{content}",
-            'general': "स्लाइड '{title}' से:\n{content}"
+            'what': "{content}",
+            'how': "{content}",
+            'why': "{content}",
+            'explain': "{content}",
+            'general': "{content}"
         },
         'es': {
-            'what': "Según la diapositiva '{title}': {content}",
-            'how': "Según la diapositiva '{title}', así es como funciona: {content}",
-            'why': "La diapositiva '{title}' explica por qué: {content}",
-            'explain': "Esta diapositiva '{title}' explica:\n{content}",
-            'general': "De la diapositiva '{title}':\n{content}"
+            'what': "{content}",
+            'how': "{content}",
+            'why': "{content}",
+            'explain': "{content}",
+            'general': "{content}"
         },
         'fr': {
-            'what': "Selon la diapositive '{title}': {content}",
-            'how': "Selon la diapositive '{title}', voici comment cela fonctionne: {content}",
-            'why': "La diapositive '{title}' explique pourquoi: {content}",
-            'explain': "Cette diapositive '{title}' explique:\n{content}",
-            'general': "De la diapositive '{title}':\n{content}"
+            'what': "{content}",
+            'how': "{content}",
+            'why': "{content}",
+            'explain': "{content}",
+            'general': "{content}"
         },
         'de': {
-            'what': "Basierend auf Folie '{title}': {content}",
-            'how': "Laut Folie '{title}' funktioniert es so: {content}",
-            'why': "Folie '{title}' erklärt warum: {content}",
-            'explain': "Diese Folie '{title}' erklärt:\n{content}",
-            'general': "Von Folie '{title}':\n{content}"
+            'what': "{content}",
+            'how': "{content}",
+            'why': "{content}",
+            'explain': "{content}",
+            'general': "{content}"
         }
     }
     
@@ -818,5 +818,3 @@ Recomendaciones:
         # Translate English template to target language
         english_template = summary_templates['en']
         return translation_service.translate_text(english_template, language)
-
-
