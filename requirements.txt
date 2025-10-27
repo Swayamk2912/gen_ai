@@ -1,12 +1,30 @@
+# ---- Core Framework ----
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
+python-dotenv==1.0.1
 python-multipart==0.0.9
-python-pptx==0.6.23
-gTTS==2.5.4
 jinja2==3.1.4
-numpy==1.26.4
-scikit-learn==1.4.2
 aiofiles==23.2.1
 requests==2.32.3
 
+# ---- File & Media Handling ----
+python-pptx==0.6.23
+gTTS==2.5.4
 reportlab==4.2.2
+PyPDF2==3.0.1
+pandas==2.2.3
+
+# ---- ML / Vector / Embeddings ----
+numpy==1.26.4
+scikit-learn==1.5.2
+chromadb==0.5.17
+tiktoken==0.7.0
+
+# ---- LangChain + Google Generative AI ----
+# ---- LangChain + Google Generative AI ----
+langchain
+langchain-community
+langchain-google-genai
+google-generativeai
+chromadb
+tiktoken

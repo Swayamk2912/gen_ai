@@ -998,9 +998,16 @@ window.addEventListener('DOMContentLoaded', () => {
           narrate();
         }
         break;
-      case 'r':
+case 'r':
         e.preventDefault();
         repeatSlide();
+        break;
+      case 'Escape':
+        e.preventDefault();
+        const slideDisplay = document.getElementById('originalSlideDisplay');
+        if (slideDisplay && slideDisplay.style.position === 'fixed') {
+          toggleSlideView();
+        }
         break;
     }
   });
