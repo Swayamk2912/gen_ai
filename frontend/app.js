@@ -32,7 +32,7 @@ async function upload() {
     const form = new FormData();
     form.append('file', file);
 
-    const res = await fetch(`${window.BACKEND_BASE}/upload`, { method: 'POST', body: form });
+    const res = await fetch(`${window.BACKEND_BASE}/presentation/upload`, { method: 'POST', body: form });
     if (!res.ok) {
       const maybeText = await res.text().catch(() => '');
       throw new Error(`Upload failed (${res.status}). ${maybeText}`);
