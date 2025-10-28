@@ -1,0 +1,7 @@
+- [ ] Investigate microphone issue in dialog box after slides.
+- [ ] Examine `frontend/index.html` for dialog box structure.
+- [ ] Examine `frontend/app.js` for microphone logic.
+- [ ] Identify the cause of the microphone failure.
+- [ ] Implement a fix for the microphone functionality.
+- [ ] Test the fix.
+- [ ] Verify the microphone works correctly.

@@ -8,7 +8,7 @@ import hashlib
 
 class TranslationService:
     """Multi-language translation service with multiple providers and fallbacks"""
-    
+        
     def __init__(self):
         self.providers = {
             'libretranslate': {

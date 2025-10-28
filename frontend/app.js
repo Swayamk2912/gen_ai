@@ -1017,7 +1017,194 @@ case 'r':
   
   // Load supported languages
   loadSupportedLanguages();
+
+  // Initialize speech recognition
+  initializeSpeechRecognition();
 });
+
+// Speech Recognition functions
+function initializeSpeechRecognition() {
+  const mainMicrophoneBtn = document.getElementById('microphoneBtn');
+  if (mainMicrophoneBtn) {
+    mainMicrophoneBtn.addEventListener('click', startSpeechRecognition);
+  }
+
+  const modalMicrophoneBtn = document.getElementById('modalMicrophoneBtn');
+  if (modalMicrophoneBtn) {
+    modalMicrophoneBtn.addEventListener('click', startModalSpeechRecognition);
+  }
+}
+
+// Function for the main microphone button
+function startSpeechRecognition() {
+  const questionInput = document.getElementById('question'); // Main input
+  const statusIndicator = document.getElementById('statusIndicator');
+  const presenterStatus = document.getElementById('presenterStatus');
+
+  if (!('webkitSpeechRecognition' in window)) {
+    alert('Your browser does not support speech recognition. Please try a different browser.');
+    return;
+  }
+
+  const recognition = new webkitSpeechRecognition();
+  recognition.continuous = false;
+  recognition.lang = document.getElementById('language').value || 'en-US'; // Use selected language
+  recognition.interimResults = false;
+
+  recognition.onstart = () => {
+    console.log('Speech recognition started');
+    if (statusIndicator) {
+      statusIndicator.textContent = 'Listening...';
+      statusIndicator.className = 'status-indicator listening';
+    }
+    if (presenterStatus) {
+      presenterStatus.textContent = 'Listening...';
+    }
+    // Disable other controls while listening
+    disableControls(true);
+  };
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    console.log('Speech recognized:', transcript);
+    questionInput.value = transcript;
+    // Automatically trigger the ask function after transcription
+    ask();
+  };
+
+  recognition.onerror = (event) => {
+    console.error('Speech recognition error:', event.error);
+    if (statusIndicator) {
+      statusIndicator.textContent = 'Speech recognition error';
+      statusIndicator.className = 'status-indicator error';
+    }
+    if (presenterStatus) {
+      presenterStatus.textContent = 'Speech recognition error';
+    }
+    // Re-enable controls
+    disableControls(false);
+  };
+
+  recognition.onend = () => {
+    console.log('Speech recognition ended');
+    // Reset status indicators
+    if (statusIndicator) {
+      statusIndicator.textContent = 'Ready';
+      statusIndicator.className = 'status-indicator';
+    }
+    if (presenterStatus) {
+      presenterStatus.textContent = 'Ready to present';
+    }
+    // Re-enable controls
+    disableControls(false);
+  };
+
+  recognition.start();
+}
+
+// New function for the modal microphone button
+function startModalSpeechRecognition() {
+  const questionInput = document.getElementById('modalQuestion'); // Modal input
+  const statusIndicator = document.getElementById('statusIndicator');
+  const presenterStatus = document.getElementById('presenterStatus');
+
+  if (!('webkitSpeechRecognition' in window)) {
+    alert('Your browser does not support speech recognition. Please try a different browser.');
+    return;
+  }
+
+  const recognition = new webkitSpeechRecognition();
+  recognition.continuous = false;
+  recognition.lang = document.getElementById('language').value || 'en-US'; // Use selected language
+  recognition.interimResults = false;
+
+  recognition.onstart = () => {
+    console.log('Modal speech recognition started');
+    if (statusIndicator) {
+      statusIndicator.textContent = 'Listening...';
+      statusIndicator.className = 'status-indicator listening';
+    }
+    if (presenterStatus) {
+      presenterStatus.textContent = 'Listening...';
+    }
+    // Disable other controls while listening
+    disableControls(true);
+  };
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    console.log('Modal speech recognized:', transcript);
+    questionInput.value = transcript; // Target modal input
+    // Automatically trigger the ask function after transcription
+    askInModal(); // Call the modal-specific ask function
+  };
+
+  recognition.onerror = (event) => {
+    console.error('Modal speech recognition error:', event.error);
+    if (statusIndicator) {
+      statusIndicator.textContent = 'Speech recognition error';
+      statusIndicator.className = 'status-indicator error';
+    }
+    if (presenterStatus) {
+      presenterStatus.textContent = 'Speech recognition error';
+    }
+    // Re-enable controls
+    disableControls(false);
+  };
+
+  recognition.onend = () => {
+    console.log('Modal speech recognition ended');
+    // Reset status indicators
+    if (statusIndicator) {
+      statusIndicator.textContent = 'Ready';
+      statusIndicator.className = 'status-indicator';
+    }
+    if (presenterStatus) {
+      presenterStatus.textContent = 'Ready to present';
+    }
+    // Re-enable controls
+    disableControls(false);
+  };
+
+  recognition.start();
+}
+
+function disableControls(disabled) {
+  const uploadBtn = document.getElementById('uploadBtn');
+  const narrateBtn = document.getElementById('narrateBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const prevBtn = document.getElementById('prevBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const resumeBtn = document.getElementById('resumeBtn');
+  const askBtn = document.getElementById('askBtn');
+  const microphoneBtn = document.getElementById('microphoneBtn');
+  const questionInput = document.getElementById('question');
+
+  uploadBtn.disabled = disabled;
+  narrateBtn.disabled = disabled;
+  nextBtn.disabled = disabled;
+  prevBtn.disabled = disabled;
+  pauseBtn.disabled = disabled;
+  resumeBtn.disabled = disabled;
+  askBtn.disabled = disabled;
+  microphoneBtn.disabled = disabled;
+  questionInput.disabled = disabled;
+}
+
+function showQAModal() {
+  document.getElementById('qaModal').style.display = 'block';
+  document.getElementById('modalQuestion').focus();
+}
+
+function hideQAModal() {
+  document.getElementById('qaModal').style.display = 'none';
+  document.getElementById('modalQuestion').value = '';
+  document.getElementById('modalAnswer').textContent = '';
+}
+
+
+
+// showQAModal function starts here in the original file
 
 function showQAModal() {
   document.getElementById('qaModal').style.display = 'block';
@@ -1054,6 +1241,7 @@ async function askInModal() {
   canAdvance = true;
   updateButtonStates();
 }
+
 
 async function generateSummary() {
   if (presId == null) {

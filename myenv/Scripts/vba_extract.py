@@ -1,4 +1,4 @@
-#!C:\Users\sonuk\OneDrive\Desktop\gen_ai\myenv\Scripts\python.exe
+#!C:\Users\Rima\Desktop\gen_ai\myenv\Scripts\python.exe
 
 ##############################################################################
 #
